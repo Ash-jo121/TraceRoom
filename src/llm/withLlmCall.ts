@@ -1,5 +1,6 @@
 import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { env } from "../config/env";
+import { recordLlmMetrics } from "../telemetry/llmMetrics";
 
 const tracer = trace.getTracer("traceroom-debate-simulation", "0.1.0");
 
@@ -49,11 +50,19 @@ export async function withLlmCall<T extends LlmCompletionLike>(
     async (span) => {
       const startedAt = performance.now();
 
+      let responseModel: string | undefined;
+      let inputTokens: number | undefined;
+      let outputTokens: number | undefined;
+      let totalCostUsd: number | undefined;
+      let outcome: "success" | "error" = "error";
+
       try {
         const completion = await call();
 
-        const inputTokens = completion.usage?.prompt_tokens;
-        const outputTokens = completion.usage?.completion_tokens;
+        responseModel = completion.model;
+
+        inputTokens = completion.usage?.prompt_tokens;
+        outputTokens = completion.usage?.completion_tokens;
 
         const reportedCachedTokens =
           completion.usage?.prompt_tokens_details?.cached_tokens ?? 0;
@@ -101,7 +110,7 @@ export async function withLlmCall<T extends LlmCompletionLike>(
           const outputCostUsd =
             (outputTokens / 1_000_000) * env.LLM_OUTPUT_COST_PER_1M_USD;
 
-          const totalCostUsd =
+          totalCostUsd =
             uncachedInputCostUsd + cachedInputCostUsd + outputCostUsd;
 
           span.setAttributes({
@@ -111,6 +120,8 @@ export async function withLlmCall<T extends LlmCompletionLike>(
             "llm.cost_usd": totalCostUsd,
           });
         }
+
+        outcome = "success";
 
         span.setStatus({
           code: SpanStatusCode.OK,
@@ -130,7 +141,22 @@ export async function withLlmCall<T extends LlmCompletionLike>(
 
         throw error;
       } finally {
-        span.setAttribute("llm.latency_ms", performance.now() - startedAt);
+        const latencyMs = performance.now() - startedAt;
+
+        span.setAttribute("llm.latency_ms", latencyMs);
+
+        recordLlmMetrics({
+          agentId: context.agentId,
+          agentName: context.agentName,
+          stage: context.stage,
+          requestModel: env.LLM_MODEL,
+          responseModel,
+          inputTokens,
+          outputTokens,
+          costUsd: totalCostUsd,
+          latencyMs,
+          outcome,
+        });
 
         span.end();
       }
