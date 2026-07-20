@@ -10,6 +10,7 @@ import { logInfo } from "./telemetry/logger";
 import { evaluationFixture } from "./fixtures/evaluationFixture";
 import { Position } from "./schemas/proposal";
 import { runEvaluationTrace } from "./evaluation/runEvaluationTrace";
+import { traceMarketSnapshot } from "./market/traceMarketSnapshot";
 
 console.log("TraceRoom Debate Simulation Starting...");
 
@@ -47,7 +48,6 @@ async function runDebateSession() {
   const debateResult = await withSpan("debate.session", async (sessionSpan) => {
     sessionSpan.setAttributes({
       "traceroom.session.id": sessionId,
-      "traceroom.mode": "learning-poc",
       "market.snapshot.id": marketSnapshot.snapshotId,
       "market.symbol": marketSnapshot.symbol,
       "decision.horizon_minutes": marketSnapshot.decisionHorizonMinutes,
@@ -55,11 +55,7 @@ async function runDebateSession() {
       "debate.max_rounds": 3,
     });
 
-    sessionSpan.addEvent("market.snapshot.ready", {
-      "snapshot.id": marketSnapshot.snapshotId,
-      symbol: marketSnapshot.symbol,
-      price: marketSnapshot.currentPrice,
-    });
+    await traceMarketSnapshot(marketSnapshot);
 
     // Move your existing pipeline here:
     const proposals = await withSpan("debate.round.proposal", async (span) => {
