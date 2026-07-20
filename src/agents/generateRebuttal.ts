@@ -6,6 +6,8 @@ import { env } from "../config/env";
 import { llmClient } from "../llm/llmClient";
 import { toApiMessage } from "../llm/toApiMessage";
 import { buildRebuttalPrompt } from "../prompts/buildRebuttalPrompt";
+import { withLlmCall } from "../llm/withLlmCall";
+import { zodResponseFormat } from "openai/helpers/zod.mjs";
 
 export async function generateRebuttal(
   agent: AgentConfig,
@@ -16,13 +18,23 @@ export async function generateRebuttal(
 
   const apiMessages = promptMessages.map(toApiMessage);
 
-  const completion = await llmClient.chat.completions.create({
-    model: env.LLM_MODEL,
-    messages: apiMessages,
-    response_format: {
-      type: "json_object",
+  const completion = await withLlmCall(
+    {
+      agentId: agent.agentId,
+      agentName: agent.displayName,
+      stage: "CROSS_EXAMINATION",
+      snapshotId: snapshot.snapshotId,
     },
-  });
+    () =>
+      llmClient.chat.completions.parse({
+        model: env.LLM_MODEL,
+        messages: apiMessages,
+        response_format: zodResponseFormat(
+          RebuttalContentSchema,
+          "agent_rebuttal",
+        ),
+      }),
+  );
 
   const rawContent = completion.choices[0]?.message.content;
 

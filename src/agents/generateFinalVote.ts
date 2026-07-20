@@ -7,6 +7,8 @@ import { toApiMessage } from "../llm/toApiMessage";
 import { AgentRebuttal } from "../schemas/rebuttal";
 import { buildFinalVotePrompt } from "../prompts/buildFinalVotePrompt";
 import { FinalVote, FinalVoteContentSchema } from "../schemas/finalVote";
+import { zodResponseFormat } from "openai/helpers/zod.mjs";
+import { withLlmCall } from "../llm/withLlmCall";
 
 export async function generateFinalVote(
   agent: AgentConfig,
@@ -30,23 +32,58 @@ export async function generateFinalVote(
   );
   const apiMessages = promptMessages.map(toApiMessage);
 
-  const completion = await llmClient.chat.completions.create({
-    model: env.LLM_MODEL,
-    messages: apiMessages,
-    response_format: {
-      type: "json_object",
+  const completion = await withLlmCall(
+    {
+      agentId: agent.agentId,
+      agentName: agent.displayName,
+      stage: "FINAL_VOTE",
+      snapshotId: snapshot.snapshotId,
     },
-  });
+    () =>
+      llmClient.chat.completions.parse({
+        model: env.LLM_MODEL,
+        messages: apiMessages,
+        response_format: zodResponseFormat(
+          FinalVoteContentSchema,
+          "final_vote",
+        ),
+      }),
+  );
 
-  const rawContent = completion.choices[0].message.content;
+  const validatedContent = completion.choices[0].message.parsed;
 
-  if (!rawContent) {
-    throw new Error("LLM returned an empty proposal");
+  if (!validatedContent) {
+    throw new Error("LLM returned an empty or refused final vote");
   }
 
-  const parsedContent: unknown = JSON.parse(rawContent);
+  const expectedSourceAgentIds = rebuttals.flatMap((rebuttal) =>
+    rebuttal.critiques.some(
+      (critique) => critique.targetAgentId === agent.agentId,
+    )
+      ? [rebuttal.agentId]
+      : [],
+  );
 
-  const validatedContent = FinalVoteContentSchema.parse(parsedContent);
+  const actualSourceAgentIds = validatedContent.critiqueResponses.map(
+    (response) => response.sourceAgentId,
+  );
+
+  const expectedIds = [...expectedSourceAgentIds].sort();
+  const actualIds = [...actualSourceAgentIds].sort();
+
+  const hasDuplicateIds =
+    new Set(actualSourceAgentIds).size !== actualSourceAgentIds.length;
+
+  if (
+    hasDuplicateIds ||
+    JSON.stringify(expectedIds) !== JSON.stringify(actualIds)
+  ) {
+    throw new Error(
+      `${agent.agentId} returned invalid critique response IDs. ` +
+        `Expected ${JSON.stringify(expectedIds)}, ` +
+        `received ${JSON.stringify(actualIds)}`,
+    );
+  }
 
   const supportedAgentId = validatedContent.supportedProposalAgentId;
 

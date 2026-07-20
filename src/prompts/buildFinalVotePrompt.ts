@@ -37,10 +37,13 @@ export function buildFinalVotePrompt(
       })),
   );
 
-  if (critiquesReceived.length !== 2) {
+  const critiqueSourceAgentIds = critiquesReceived.map(
+    (critique) => critique.sourceAgentId,
+  );
+
+  if (new Set(critiqueSourceAgentIds).size !== 2) {
     throw new Error(
-      `Expected two critiques of ${agent.agentId}, ` +
-        `received ${critiquesReceived.length}`,
+      `Expected critiques from two unique agents for ${agent.agentId}`,
     );
   }
 
@@ -63,6 +66,7 @@ Follow these rules:
 8. Identify the proposal that best supports your final position.
 9. Use null when no existing proposal adequately supports your final conclusion.
 10. Return only valid JSON with no Markdown or surrounding explanation.
+11. critiqueResponses must contain exactly two entries: one and only one response for each source agent ID listed in the user prompt.
 
 Your persona is an analytical lens, not a position you are required to defend.
 
@@ -105,6 +109,14 @@ ${JSON.stringify(proposalAgentIds)}
 CRITIQUES DIRECTED AT YOUR INITIAL PROPOSAL:
 
 ${JSON.stringify(critiquesReceived, null, 2)}
+
+REQUIRED CRITIQUE RESPONSE SOURCE AGENT IDS:
+
+${JSON.stringify(critiqueSourceAgentIds)}
+
+The critiqueResponses array must contain exactly two entries.
+It must contain each required sourceAgentId exactly once.
+Do not respond to critiques aimed at another agent.
 
 Return one JSON object with exactly these fields:
 
