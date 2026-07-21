@@ -12,6 +12,7 @@ import { Position } from "./schemas/proposal";
 import { runEvaluationTrace } from "./evaluation/runEvaluationTrace";
 import { traceMarketSnapshot } from "./market/traceMarketSnapshot";
 import { traceEvidenceValidation } from "./evidence/traceEvidenceValidation";
+import { applyControlledEvidenceFault } from "./scenarios/applyControlledEvidenceFault";
 
 console.log("TraceRoom Debate Simulation Starting...");
 
@@ -91,9 +92,32 @@ async function runDebateSession() {
 
     // Keep your existing proposal logging here.
 
+    const controlledScenario = applyControlledEvidenceFault(proposals);
+
+    sessionSpan.setAttribute("traceroom.scenario", controlledScenario.scenario);
+
+    if (controlledScenario.faultInjected) {
+      sessionSpan.setAttributes({
+        "fault.injected": true,
+        "fault.type": "evidence-price-deviation",
+        "fault.agent_id": controlledScenario.agentId,
+        "fault.claim_index": controlledScenario.claimIndex,
+        "fault.original_value": controlledScenario.originalValue,
+        "fault.tampered_value": controlledScenario.tamperedValue,
+      });
+
+      sessionSpan.addEvent("controlled_fault.injected", {
+        "fault.type": "evidence-price-deviation",
+        "agent.id": controlledScenario.agentId,
+        "evidence.claim_index": controlledScenario.claimIndex,
+        "evidence.original_value": controlledScenario.originalValue,
+        "evidence.tampered_value": controlledScenario.tamperedValue,
+      });
+    }
+
     const evidenceReport = await traceEvidenceValidation(
       marketSnapshot,
-      proposals,
+      controlledScenario.proposals,
     );
 
     sessionSpan.setAttributes({
@@ -131,7 +155,7 @@ async function runDebateSession() {
         const results = await runRebuttalStage(
           agentConfigs,
           marketSnapshot,
-          proposals,
+          controlledScenario.proposals,
         );
 
         const critiqueCount = results.reduce(
@@ -165,7 +189,7 @@ async function runDebateSession() {
         const results = await runFinalVoteStage(
           agentConfigs,
           marketSnapshot,
-          proposals,
+          controlledScenario.proposals,
           rebuttals,
         );
 
