@@ -13,6 +13,8 @@ import { runEvaluationTrace } from "./evaluation/runEvaluationTrace";
 import { traceMarketSnapshot } from "./market/traceMarketSnapshot";
 import { traceEvidenceValidation } from "./evidence/traceEvidenceValidation";
 import { applyControlledEvidenceFault } from "./scenarios/applyControlledEvidenceFault";
+import { traceRiskReview } from "./risk/traceRiskreview";
+import { getRiskReviewScenario } from "./scenarios/getRiskReviewScenario";
 
 console.log("TraceRoom Debate Simulation Starting...");
 
@@ -270,12 +272,56 @@ async function runDebateSession() {
       "consensus.no_trade_count": consensus.voteCounts.NO_TRADE,
     });
 
+    const riskScenario = getRiskReviewScenario();
+
+    if (riskScenario.policyOverridden) {
+      sessionSpan.setAttributes({
+        "traceroom.scenario": riskScenario.scenario,
+        "risk.policy.overridden": true,
+        "risk.policy.overridden_rule_id":
+          riskScenario.overriddenRuleId ?? "NONE",
+        "risk.policy.original_threshold": riskScenario.originalThreshold ?? 0,
+        "risk.policy.scenario_threshold": riskScenario.scenarioThreshold ?? 0,
+      });
+
+      sessionSpan.addEvent("controlled_risk_policy.applied", {
+        "risk.rule.id": riskScenario.overriddenRuleId ?? "NONE",
+        "risk.policy.original_threshold": riskScenario.originalThreshold ?? 0,
+        "risk.policy.scenario_threshold": riskScenario.scenarioThreshold ?? 0,
+      });
+    }
+
+    const riskReview = await traceRiskReview(
+      consensus,
+      marketSnapshot,
+      riskScenario.policy,
+    );
+
+    sessionSpan.setAttributes({
+      "risk.review.status": riskReview.status,
+      "risk.position": riskReview.position ?? "NONE",
+      "risk.trade_allowed": riskReview.tradeAllowed,
+      "risk.triggered_rule_count": riskReview.triggeredRuleIds.length,
+      "risk.triggered_rule_ids": [...riskReview.triggeredRuleIds],
+    });
+
+    sessionSpan.addEvent("risk.review.completed", {
+      "risk.review.status": riskReview.status,
+      "risk.position": riskReview.position ?? "NONE",
+      "risk.trade_allowed": riskReview.tradeAllowed,
+      "risk.triggered_rule_count": riskReview.triggeredRuleIds.length,
+    });
+
     return {
       sourceSpanContext: sessionSpan.spanContext(),
       consensus,
+      riskReview,
       finalVoteReports,
     };
   });
+
+  console.log("\nRisk review:");
+  console.log(JSON.stringify(debateResult.riskReview, null, 2));
 
   if (
     debateResult.consensus.status === "CONSENSUS" &&
