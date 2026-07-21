@@ -11,6 +11,7 @@ import { evaluationFixture } from "./fixtures/evaluationFixture";
 import { Position } from "./schemas/proposal";
 import { runEvaluationTrace } from "./evaluation/runEvaluationTrace";
 import { traceMarketSnapshot } from "./market/traceMarketSnapshot";
+import { traceEvidenceValidation } from "./evidence/traceEvidenceValidation";
 
 console.log("TraceRoom Debate Simulation Starting...");
 
@@ -89,6 +90,34 @@ async function runDebateSession() {
     });
 
     // Keep your existing proposal logging here.
+
+    const evidenceReport = await traceEvidenceValidation(
+      marketSnapshot,
+      proposals,
+    );
+
+    sessionSpan.setAttributes({
+      "evidence.checked_count": evidenceReport.checkedCount,
+      "evidence.valid_count": evidenceReport.validCount,
+      "evidence.invalid_count": evidenceReport.invalidCount,
+      "evidence.invalid_agent_count": evidenceReport.invalidAgentCount,
+      "evidence.validation.status": evidenceReport.validationStatus,
+      "evidence.blocked": evidenceReport.blocked,
+    });
+
+    sessionSpan.addEvent("evidence.validation.completed", {
+      "evidence.checked_count": evidenceReport.checkedCount,
+      "evidence.valid_count": evidenceReport.validCount,
+      "evidence.invalid_count": evidenceReport.invalidCount,
+      "evidence.validation.status": evidenceReport.validationStatus,
+      "evidence.blocked": evidenceReport.blocked,
+    });
+
+    if (evidenceReport.blocked) {
+      throw new Error(
+        `Debate blocked: ${evidenceReport.invalidCount} evidence claim(s) failed validation`,
+      );
+    }
 
     const rebuttals = await withSpan(
       "debate.round.cross_examination",
