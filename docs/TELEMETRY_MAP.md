@@ -1,60 +1,50 @@
 # Telemetry Map
 
-## Traces
+## Healthy Debate Trace
 
-Primary session span:
+Root span:
 
-- `decision.session`
+- `debate.session`
 
-Child spans:
+Children:
 
 - `market.snapshot`
-- `agent.argument`
+  - `market.quote`
+- `debate.round.proposal`
+  - three `agent.proposal`
+    - one `llm.call` per agent
 - `evidence.validation`
-- `consensus.resolution`
+- `debate.round.cross_examination`
+  - three `agent.rebuttal`
+    - one `llm.call` per agent
+- `debate.round.final_vote`
+  - three `agent.final_vote`
+    - one `llm.call` per agent
+- `consensus.resolve`
 - `risk.review`
-- `trade.execution.attempt`
-- `trade.execution` only when approved
-- `audit.proof_pack.export`
+
+This totals 27 spans. A separate `decision.evaluation` trace is linked to the
+source debate span.
 
 ## Core Attributes
 
-- `session.id`
-- `ticker`
-- `mode`
-- `outcome`
-- `agent.name`
-- `position`
-- `confidence`
-- `evidence_integrity.status`
-- `risk.approved`
-- `failed_rules`
-- `traceroom.version`
-
-## Logs
-
-Structured log events should include:
-
-- `session.created`
-- `market.snapshot.ready`
-- `agent.proposal`
-- `agent.critique`
-- `agent.final_vote`
-- `consensus.resolved`
-- `evidence.validation.failure`
-- `risk.review.completed`
-- `trade.blocked`
-- `trade.executed`
-- `audit.proof_pack.exported`
+- `traceroom.session.id`
+- `traceroom.session.mode`
+- `traceroom.scenario`
+- `market.snapshot.id`
+- `market.symbol`
+- `agent.id`, `agent.name`, and `agent.persona`
+- proposal/final-vote position and confidence
+- evidence validation counts and status
+- consensus position, supporters, dissenters, and changed agents
+- risk status, triggered rules, and `risk.trade_allowed`
+- LLM provider, model, token counts, cost, and latency
 
 ## Metrics
 
-Implemented demo metrics:
-
-- `traceroom.decision.count`
-- `traceroom.evidence.violation.count`
-- `traceroom.evidence.integrity.score`
-- `traceroom.risk.rule.trigger.count`
-- `traceroom.audit.proof_pack.count`
-
-Existing LLM/evaluation metrics remain available for the earlier prototype path.
+- `traceroom.llm.calls`
+- `traceroom.llm.input_tokens`
+- `traceroom.llm.output_tokens`
+- `traceroom.llm.cost_usd`
+- `traceroom.llm.latency_ms`
+- evaluation completion and decision-regret metrics

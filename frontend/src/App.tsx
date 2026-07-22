@@ -3,7 +3,6 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { ButtonGroup } from "@astryxdesign/core/ButtonGroup";
 import { Card } from "@astryxdesign/core/Card";
-import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { Divider } from "@astryxdesign/core/Divider";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid } from "@astryxdesign/core/Grid";
@@ -19,69 +18,95 @@ import { useEffect, useMemo, useState } from "react";
 type SessionMode = "healthy" | "fault";
 type ActiveTab = "overview" | "agents" | "replay" | "audit";
 
-interface EvidenceClaim {
-  citedPrice: number;
-  authoritativePrice: number;
-  deviationPercent: number;
-  tolerancePercent: number;
-  status: "PASS" | "CRITICAL";
-}
-
-interface AgentProposal {
-  agentId: string;
-  agentName: string;
-  position: string;
-  confidence: number;
-  entryPrice: number;
-  quantity: number;
-  thesis: string;
-  evidence: EvidenceClaim[];
-  riskFlags: string[];
-}
-
-interface DemoSession {
+interface RecordedSession {
   sessionId: string;
   createdAt: string;
   mode: SessionMode;
-  fixture: {
-    ticker: string;
-    referencePrice: number;
-    faultPrice: number;
-    tolerancePercent: number;
-    syntheticCapital: number;
+  scenario: string;
+  snapshot: {
+    snapshotId: string;
+    symbol: string;
+    observedAt: string;
+    decisionHorizonMinutes: number;
+    currentPrice: number;
+    previousClose: number;
+    dayOpen: number;
+    dayHigh: number;
+    dayLow: number;
+    volume: number;
+    averageVolume: number;
+    indicators: {
+      sma20: number;
+      ema9: number;
+      rsi14: number;
+    };
   };
+  agents: Array<{
+    agentId: string;
+    displayName: string;
+    persona: string;
+    riskAppetite: string;
+  }>;
   lifecycle: string[];
-  proposals: AgentProposal[];
+  proposals: Array<{
+    agentId: string;
+    position: string;
+    confidence: number;
+    thesis: string;
+    evidence: Array<{
+      sourceId: string;
+      claimType: string;
+      citedValue: number;
+      statement: string;
+    }>;
+    risks: string[];
+  }>;
+  rebuttals: unknown[];
   finalVotes: Array<{
-    agentName: string;
+    agentId: string;
     position: string;
     confidence: number;
     rationale: string;
+    initialPosition: string;
+    changedFromInitial: boolean;
   }>;
   consensus: {
     status: string;
     position: string | null;
-    matchingVotes: number;
-    rationale: string;
+    unanimous: boolean;
+    voteCounts: Record<string, number>;
+    supportingAgentIds: string[];
+    changedAgentIds: string[];
+    dissentingAgentIds?: string[];
   };
-  evidenceIntegrity: {
-    score: number;
-    status: "PASS" | "WARN" | "CRITICAL";
-    explanation: string;
+  evidenceValidation: {
+    checkedCount: number;
+    validCount: number;
+    invalidCount: number;
+    invalidAgentCount: number;
+    validationStatus: string;
+    blocked: boolean;
+    agents: Array<{
+      agentId: string;
+      validationStatus: string;
+      checkedCount: number;
+      validCount: number;
+      invalidCount: number;
+    }>;
   };
   riskReview: {
-    approved: boolean;
-    failedRules: string[];
+    status: "APPROVED" | "VETOED" | "DEADLOCKED";
+    tradeAllowed: boolean;
+    triggeredRuleIds: string[];
     rules: Array<{
-      ruleName: string;
-      passed: boolean;
-      severity: string;
-      detail: string;
+      ruleId: string;
+      outcome: "PASSED" | "TRIGGERED" | "NOT_APPLICABLE";
+      message: string;
     }>;
   };
   execution: {
     executionAllowed: boolean;
-    status: "EXECUTED" | "BLOCKED";
+    status: "READY" | "BLOCKED";
     reason: string;
   };
   outcome: string;
@@ -91,29 +116,23 @@ interface DemoSession {
     detail: string;
   }>;
   signoz: {
-    traceId: string | null;
-    traceUrl: string | null;
+    traceId: string;
+    traceUrl: string;
     logsHint: string;
-    dashboardUrl: string | null;
+    dashboardUrl: string;
   };
 }
 
-interface ProofPack {
-  markdown: string;
-  auditor_summary: string;
-}
-
 const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
+  import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export function App() {
   const toast = useToast();
-  const [sessions, setSessions] = useState<DemoSession[]>([]);
+  const [sessions, setSessions] = useState<RecordedSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadingMode, setLoadingMode] = useState<SessionMode | null>(null);
   const [filter, setFilter] = useState<"all" | SessionMode>("all");
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
-  const [proofPack, setProofPack] = useState<ProofPack | null>(null);
   const [replayIndex, setReplayIndex] = useState(0);
 
   const filteredSessions = useMemo(
@@ -137,58 +156,53 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    setProofPack(null);
     setReplayIndex(0);
     setActiveTab("overview");
   }, [selectedSession?.sessionId]);
 
   async function loadSessions() {
-    const response = await fetch(`${apiBaseUrl}/sessions`);
-    if (response.ok) {
-      const data = (await response.json()) as DemoSession[];
+    try {
+      const data = await requestJson<RecordedSession[]>(`${apiBaseUrl}/sessions`);
       setSessions(data);
       setSelectedId((current) => current ?? data[0]?.sessionId ?? null);
+    } catch (error) {
+      toast({
+        body: getErrorMessage(error, "Could not connect to the TraceRoom API."),
+        uniqueID: "load-sessions-error",
+      });
     }
   }
 
   async function runSession(mode: SessionMode) {
     setLoadingMode(mode);
     try {
-      const response = await fetch(`${apiBaseUrl}/sessions/run?mode=${mode}`, {
-        method: "POST",
-      });
-      const session = (await response.json()) as DemoSession;
+      const session = await requestJson<RecordedSession>(
+        `${apiBaseUrl}/sessions/run?mode=${mode}`,
+        { method: "POST" },
+      );
       setSessions((current) => [session, ...current]);
       setSelectedId(session.sessionId);
       setFilter("all");
       toast({
         body:
           mode === "fault"
-            ? "Fault session blocked by EVIDENCE_INTEGRITY."
-            : "Healthy session executed synthetically.",
+            ? "Fault scenario requested."
+            : "Healthy ACME debate completed and traced.",
         uniqueID: `run-${mode}`,
+      });
+    } catch (error) {
+      toast({
+        body: getErrorMessage(error, `Could not run the ${mode} session.`),
+        uniqueID: `run-${mode}-error`,
       });
     } finally {
       setLoadingMode(null);
     }
   }
 
-  async function exportProofPack(sessionId: string) {
-    const response = await fetch(`${apiBaseUrl}/sessions/${sessionId}/proof-pack`);
-    const pack = (await response.json()) as ProofPack;
-    setProofPack(pack);
-    setActiveTab("audit");
-    toast({ body: "Audit proof pack exported.", uniqueID: "proof-pack" });
-  }
-
   async function copySessionId(sessionId: string) {
     await navigator.clipboard.writeText(sessionId);
     toast({ body: "Session ID copied.", uniqueID: "copy-session-id" });
-  }
-
-  async function copyMarkdown(markdown: string) {
-    await navigator.clipboard.writeText(markdown);
-    toast({ body: "Proof pack markdown copied.", uniqueID: "copy-proof-pack" });
   }
 
   return (
@@ -204,10 +218,10 @@ export function App() {
                 TraceRoom
               </Text>
               <Heading level={1} type="display-3">
-                Decision recorder
+                Agent audit layer
               </Heading>
               <Text type="supporting">
-                INFY evidence integrity demo backed by persisted telemetry.
+                Investigate and govern agent decisions with SigNoz-backed evidence.
               </Text>
             </VStack>
 
@@ -220,10 +234,10 @@ export function App() {
                 clickAction={() => runSession("healthy")}
               />
               <Button
-                label="Run Fault Session"
+                label="Fault Session (next)"
                 variant="destructive"
                 isLoading={loadingMode === "fault"}
-                isDisabled={loadingMode !== null}
+                isDisabled
                 clickAction={() => runSession("fault")}
               />
             </ButtonGroup>
@@ -270,7 +284,7 @@ export function App() {
                     onClick={() => setSelectedId(session.sessionId)}
                   >
                     <span>
-                      <strong>{session.fixture.ticker}</strong>
+                      <strong>{session.snapshot.symbol}</strong>
                       <small>{shortId(session.sessionId)}</small>
                     </span>
                     <Badge
@@ -301,33 +315,30 @@ export function App() {
             <Header
               session={selectedSession}
               onCopySession={() => void copySessionId(selectedSession.sessionId)}
-              onExport={() => void exportProofPack(selectedSession.sessionId)}
             />
 
             <Grid columns={{ minWidth: 190, max: 5 }} gap={3}>
               <MetricCard
-                label="Momentum Claim"
-                value={formatPrice(momentumClaim(selectedSession).citedPrice)}
-                status="error"
+                label="Current Price"
+                value={formatPrice(selectedSession.snapshot.currentPrice)}
               />
               <MetricCard
-                label="Authoritative Price"
-                value={formatPrice(momentumClaim(selectedSession).authoritativePrice)}
+                label="Previous Close"
+                value={formatPrice(selectedSession.snapshot.previousClose)}
               />
               <MetricCard
-                label="Deviation"
-                value={`${momentumClaim(selectedSession).deviationPercent.toFixed(2)}%`}
-                status="error"
+                label="Day Range"
+                value={`${formatPrice(selectedSession.snapshot.dayLow)}–${formatPrice(selectedSession.snapshot.dayHigh)}`}
               />
               <MetricCard
-                label="Tolerance"
-                value={`${momentumClaim(selectedSession).tolerancePercent.toFixed(2)}%`}
+                label="RSI (14)"
+                value={selectedSession.snapshot.indicators.rsi14.toFixed(1)}
               />
               <MetricCard
-                label="Integrity Score"
-                value={`${selectedSession.evidenceIntegrity.score}`}
+                label="Valid Evidence"
+                value={`${selectedSession.evidenceValidation.validCount}/${selectedSession.evidenceValidation.checkedCount}`}
                 status={
-                  selectedSession.evidenceIntegrity.status === "CRITICAL"
+                  selectedSession.evidenceValidation.blocked
                     ? "error"
                     : "success"
                 }
@@ -357,24 +368,19 @@ export function App() {
               />
             )}
             {activeTab === "audit" && (
-              <AuditTab
-                session={selectedSession}
-                proofPack={proofPack}
-                onExport={() => void exportProofPack(selectedSession.sessionId)}
-                onCopyMarkdown={(markdown) => void copyMarkdown(markdown)}
-              />
+              <AuditTab session={selectedSession} />
             )}
           </VStack>
         ) : (
           <div className="tr-empty">
             <EmptyState
               title="Run a session to begin"
-              description="The fault path creates the canonical INFY evidence-integrity incident."
+              description="Run the ACME replay snapshot through all three agents."
               actions={
                 <Button
-                  label="Run Fault Session"
-                  variant="destructive"
-                  clickAction={() => runSession("fault")}
+                  label="Run Healthy Session"
+                  variant="primary"
+                  clickAction={() => runSession("healthy")}
                 />
               }
             />
@@ -388,11 +394,9 @@ export function App() {
 function Header({
   session,
   onCopySession,
-  onExport,
 }: {
-  session: DemoSession;
+  session: RecordedSession;
   onCopySession: () => void;
-  onExport: () => void;
 }) {
   return (
     <header className="tr-header">
@@ -411,7 +415,7 @@ function Header({
           />
         </HStack>
         <Heading level={2} type="display-2">
-          {session.fixture.ticker} evidence integrity review
+          {session.snapshot.symbol} agent debate
         </Heading>
         <HStack gap={3} wrap="wrap">
           <Text type="supporting">
@@ -421,19 +425,18 @@ function Header({
             Captured <Timestamp value={session.createdAt} format="date_time" />
           </Text>
           <Text type="supporting">
-            Synthetic capital {formatPrice(session.fixture.syntheticCapital)}
+            Snapshot {session.snapshot.snapshotId} · {session.snapshot.decisionHorizonMinutes}-minute horizon
           </Text>
         </HStack>
       </VStack>
       <ButtonGroup label="Session actions" size="sm">
         <Button label="Copy Session ID" variant="secondary" clickAction={onCopySession} />
-        <Button label="Export Proof Pack" variant="primary" clickAction={onExport} />
       </ButtonGroup>
     </header>
   );
 }
 
-function OverviewTab({ session }: { session: DemoSession }) {
+function OverviewTab({ session }: { session: RecordedSession }) {
   return (
     <Grid columns={{ minWidth: 340, max: 2 }} gap={4}>
       <VStack gap={4}>
@@ -444,25 +447,27 @@ function OverviewTab({ session }: { session: DemoSession }) {
             <HStack hAlign="between" vAlign="center">
               <Heading level={3}>Evidence Integrity</Heading>
               <Badge
-                label={session.evidenceIntegrity.status}
+                label={session.evidenceValidation.validationStatus.toUpperCase()}
                 variant={
-                  session.evidenceIntegrity.status === "CRITICAL"
+                  session.evidenceValidation.blocked
                     ? "error"
                     : "success"
                 }
               />
             </HStack>
             <ProgressBar
-              label="Evidence integrity score"
-              value={session.evidenceIntegrity.score}
+              label="Valid evidence claims"
+              value={evidenceProgress(session)}
               hasValueLabel
               variant={
-                session.evidenceIntegrity.status === "CRITICAL"
+                session.evidenceValidation.blocked
                   ? "error"
                   : "success"
               }
             />
-            <Text>{session.evidenceIntegrity.explanation}</Text>
+            <Text>
+              {session.evidenceValidation.validCount} of {session.evidenceValidation.checkedCount} cited claims matched the shared ACME snapshot.
+            </Text>
           </VStack>
         </Card>
 
@@ -473,11 +478,15 @@ function OverviewTab({ session }: { session: DemoSession }) {
               <Badge label={session.consensus.status} variant="info" />
               <Badge label={session.consensus.position ?? "NONE"} variant="blue" />
               <Badge
-                label={`${session.consensus.matchingVotes}/3 votes`}
+                label={`${matchingVoteCount(session)}/3 votes`}
                 variant="neutral"
               />
             </HStack>
-            <Text>{session.consensus.rationale}</Text>
+            <Text>
+              {session.consensus.unanimous
+                ? "All agents converged on the same final position."
+                : `${session.consensus.supportingAgentIds.length} agents supported the selected position.`}
+            </Text>
           </VStack>
         </Card>
       </VStack>
@@ -487,30 +496,30 @@ function OverviewTab({ session }: { session: DemoSession }) {
           <VStack gap={3}>
             <Heading level={3}>Risk Rules</Heading>
             <Table
-              idKey="ruleName"
+              idKey="ruleId"
               density="compact"
               dividers="rows"
               data={session.riskReview.rules}
               columns={[
                 {
-                  key: "ruleName",
+                  key: "ruleId",
                   header: "Rule",
-                  renderCell: (rule) => <Text type="code">{rule.ruleName}</Text>,
+                  renderCell: (rule) => <Text type="code">{rule.ruleId}</Text>,
                 },
                 {
                   key: "status",
                   header: "Status",
                   renderCell: (rule) => (
                     <Badge
-                      label={rule.passed ? "PASS" : rule.severity}
-                      variant={rule.passed ? "success" : "error"}
+                      label={rule.outcome}
+                      variant={rule.outcome === "TRIGGERED" ? "error" : "success"}
                     />
                   ),
                 },
                 {
-                  key: "detail",
+                  key: "message",
                   header: "Detail",
-                  renderCell: (rule) => <Text type="supporting">{rule.detail}</Text>,
+                  renderCell: (rule) => <Text type="supporting">{rule.message}</Text>,
                 },
               ]}
             />
@@ -535,7 +544,7 @@ function OverviewTab({ session }: { session: DemoSession }) {
   );
 }
 
-function OutcomeCard({ session }: { session: DemoSession }) {
+function OutcomeCard({ session }: { session: RecordedSession }) {
   const isBlocked = session.execution.status === "BLOCKED";
 
   return (
@@ -545,7 +554,7 @@ function OutcomeCard({ session }: { session: DemoSession }) {
           <Heading level={3}>
             {isBlocked
               ? "VETOED - EXECUTION BLOCKED"
-              : "APPROVED - SYNTHETIC EXECUTION"}
+              : "APPROVED - DECISION READY"}
           </Heading>
           <Badge
             label={session.execution.status}
@@ -558,7 +567,7 @@ function OutcomeCard({ session }: { session: DemoSession }) {
   );
 }
 
-function AgentsTab({ session }: { session: DemoSession }) {
+function AgentsTab({ session }: { session: RecordedSession }) {
   return (
     <VStack gap={4}>
       <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
@@ -566,21 +575,21 @@ function AgentsTab({ session }: { session: DemoSession }) {
           <Card key={proposal.agentId} padding={4}>
             <VStack gap={3}>
               <HStack hAlign="between" vAlign="center">
-                <Heading level={3}>{proposal.agentName}</Heading>
+                <Heading level={3}>{agentName(session, proposal.agentId)}</Heading>
                 <Badge label={proposal.position} variant="blue" />
               </HStack>
               <Text>{proposal.thesis}</Text>
               <Divider />
               <Grid columns={2} gap={2}>
-                <MiniDatum label="Entry" value={formatPrice(proposal.entryPrice)} />
+                <MiniDatum label="Persona" value={agentPersona(session, proposal.agentId)} />
                 <MiniDatum
                   label="Confidence"
                   value={`${Math.round(proposal.confidence * 100)}%`}
                 />
-                <MiniDatum label="Quantity" value={`${proposal.quantity}`} />
+                <MiniDatum label="Evidence claims" value={`${proposal.evidence.length}`} />
                 <MiniDatum
-                  label="Evidence"
-                  value={proposal.evidence[0]?.status ?? "PASS"}
+                  label="Validation"
+                  value={agentEvidenceStatus(session, proposal.agentId)}
                 />
               </Grid>
             </VStack>
@@ -592,15 +601,15 @@ function AgentsTab({ session }: { session: DemoSession }) {
         <VStack gap={3}>
           <Heading level={3}>Final Votes</Heading>
           <Table
-            idKey={(vote) => vote.agentName}
+            idKey={(vote) => vote.agentId}
             density="balanced"
             dividers="rows"
             data={session.finalVotes}
             columns={[
               {
-                key: "agentName",
+                key: "agentId",
                 header: "Agent",
-                renderCell: (vote) => <Text weight="semibold">{vote.agentName}</Text>,
+                  renderCell: (vote) => <Text weight="semibold">{agentName(session, vote.agentId)}</Text>,
               },
               {
                 key: "position",
@@ -630,7 +639,7 @@ function ReplayTab({
   replayIndex,
   setReplayIndex,
 }: {
-  session: DemoSession;
+  session: RecordedSession;
   replayIndex: number;
   setReplayIndex: (value: number | ((current: number) => number)) => void;
 }) {
@@ -710,110 +719,53 @@ function ReplayTab({
   );
 }
 
-function AuditTab({
-  session,
-  proofPack,
-  onExport,
-  onCopyMarkdown,
-}: {
-  session: DemoSession;
-  proofPack: ProofPack | null;
-  onExport: () => void;
-  onCopyMarkdown: (markdown: string) => void;
-}) {
-  const auditorAnswer =
-    session.outcome === "EXECUTED"
-      ? "This session executed synthetically because all evidence passed risk review."
-      : "Momentum Agent cited 1819.26, the authoritative fixture was 1684.50, deviation was 8.00%, tolerance was 2.00%, EVIDENCE_INTEGRITY failed, and execution was blocked.";
+function AuditTab({ session }: { session: RecordedSession }) {
+  const auditorAnswer = `${session.snapshot.symbol} reached ${session.consensus.status} ${session.consensus.position ?? "without a position"}. ${session.evidenceValidation.validCount}/${session.evidenceValidation.checkedCount} evidence claims passed validation and risk review was ${session.riskReview.status}. No real trade was placed.`;
 
   return (
     <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
-      <VStack gap={4}>
-        <Card padding={4}>
-          <VStack gap={3}>
-            <HStack hAlign="between" vAlign="center">
-              <Heading level={3}>Auditor Panel</Heading>
-              <Badge label="Demo Fallback" variant="warning" />
-            </HStack>
-            <Text>{auditorAnswer}</Text>
-            <Divider />
-            <VStack gap={2}>
-              <Text type="label">Supported questions</Text>
-              {[
-                "Why was this session blocked?",
-                "Which agent caused the evidence integrity failure?",
-                "What evidence did the risk engine reject?",
-                "Was execution allowed?",
-                "Export the audit summary.",
-              ].map((question) => (
-                <Text type="supporting" key={question}>
-                  {question}
-                </Text>
-              ))}
-            </VStack>
-            <Button label="Export Proof Pack" variant="primary" clickAction={onExport} />
-          </VStack>
-        </Card>
-
-        <Card padding={4}>
-          <VStack gap={3}>
-            <Heading level={3}>SigNoz Search</Heading>
-            <MiniDatum label="Trace ID" value={session.signoz.traceId ?? "Unavailable"} />
-            <MiniDatum label="Logs hint" value={session.signoz.logsHint} />
-            <HStack gap={2} wrap="wrap">
-              {session.signoz.traceUrl && (
-                <Button
-                  label="Open Trace"
-                  href={session.signoz.traceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                />
-              )}
-              {session.signoz.dashboardUrl && (
-                <Button
-                  label="Open Dashboard"
-                  href={session.signoz.dashboardUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                />
-              )}
-            </HStack>
-          </VStack>
-        </Card>
-      </VStack>
-
       <Card padding={4}>
         <VStack gap={3}>
           <HStack hAlign="between" vAlign="center">
-            <Heading level={3}>Audit Proof Pack</Heading>
-            {proofPack && (
-              <Button
-                label="Copy Markdown"
-                size="sm"
-                variant="secondary"
-                clickAction={() => onCopyMarkdown(proofPack.markdown)}
-              />
-            )}
+            <Heading level={3}>Recorded Decision Evidence</Heading>
+            <Badge label="TraceRoom Audit" variant="info" />
           </HStack>
-          {proofPack ? (
-            <CodeBlock
-              code={proofPack.markdown}
-              language="markdown"
-              title="proof-pack.md"
-              width="100%"
-              maxHeight={520}
-              isWrapped
+          <Text>{auditorAnswer}</Text>
+          <Divider />
+          <MiniDatum label="Session ID" value={session.sessionId} />
+          <MiniDatum label="Snapshot" value={session.snapshot.snapshotId} />
+          <MiniDatum
+            label="Validated evidence"
+            value={`${session.evidenceValidation.validCount}/${session.evidenceValidation.checkedCount}`}
+          />
+          <MiniDatum label="Risk verdict" value={session.riskReview.status} />
+        </VStack>
+      </Card>
+
+      <Card padding={4}>
+        <VStack gap={3}>
+          <Heading level={3}>Investigate In SigNoz</Heading>
+          <Text type="supporting">
+            SigNoz is the observability backend for the supporting trace, correlated logs, aggregate metrics, dashboards, and alerts.
+          </Text>
+          <MiniDatum label="Trace ID" value={session.signoz.traceId} />
+          <MiniDatum label="Related logs" value={session.signoz.logsHint} />
+          <HStack gap={2} wrap="wrap">
+            <Button
+              label="View Full Decision Trace"
+              href={session.signoz.traceUrl}
+              target="_blank"
+              rel="noreferrer"
+              variant="primary"
             />
-          ) : (
-            <EmptyState
-              title="No proof pack exported"
-              description="Export a proof pack to preview and copy the markdown audit record."
-              isCompact
-              actions={
-                <Button label="Export Proof Pack" variant="primary" clickAction={onExport} />
-              }
+            <Button
+              label="Investigate Dashboard"
+              href={session.signoz.dashboardUrl}
+              target="_blank"
+              rel="noreferrer"
+              variant="secondary"
             />
-          )}
+          </HStack>
         </VStack>
       </Card>
     </Grid>
@@ -856,9 +808,44 @@ function MiniDatum({ label, value }: { label: string; value: string }) {
   );
 }
 
-function momentumClaim(session: DemoSession): EvidenceClaim {
-  return session.proposals.find((proposal) => proposal.agentId === "momentum")!
-    .evidence[0];
+function evidenceProgress(session: RecordedSession): number {
+  if (session.evidenceValidation.checkedCount === 0) {
+    return 0;
+  }
+
+  return Math.round(
+    (session.evidenceValidation.validCount /
+      session.evidenceValidation.checkedCount) *
+      100,
+  );
+}
+
+function matchingVoteCount(session: RecordedSession): number {
+  return Math.max(...Object.values(session.consensus.voteCounts));
+}
+
+function agentName(session: RecordedSession, agentId: string): string {
+  return (
+    session.agents.find((agent) => agent.agentId === agentId)?.displayName ??
+    agentId
+  );
+}
+
+function agentPersona(session: RecordedSession, agentId: string): string {
+  return (
+    session.agents.find((agent) => agent.agentId === agentId)?.persona ??
+    "UNKNOWN"
+  );
+}
+
+function agentEvidenceStatus(
+  session: RecordedSession,
+  agentId: string,
+): string {
+  return (
+    session.evidenceValidation.agents.find((agent) => agent.agentId === agentId)
+      ?.validationStatus ?? "unknown"
+  ).toUpperCase();
 }
 
 function shortId(sessionId: string): string {
@@ -870,4 +857,31 @@ function formatPrice(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+
+  try {
+    response = await fetch(url, init);
+  } catch {
+    throw new Error(
+      "TraceRoom API is unavailable. Start the app with npm run dev from the repository root.",
+    );
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string }
+      | null;
+    throw new Error(
+      payload?.error ?? `TraceRoom API request failed (${response.status}).`,
+    );
+  }
+
+  return (await response.json()) as T;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { DemoSession } from "../demo/types";
+import type { RecordedSession } from "../session/types";
 
 const defaultDbPath = resolve(process.cwd(), "data", "traceroom.sqlite");
 
@@ -25,7 +25,7 @@ export class SessionStore {
     `);
   }
 
-  save(session: DemoSession): void {
+  save(session: RecordedSession): void {
     const statement = this.db.prepare(`
       INSERT OR REPLACE INTO sessions (
         session_id,
@@ -43,33 +43,53 @@ export class SessionStore {
       session.sessionId,
       session.createdAt,
       session.mode,
-      session.fixture.ticker,
+      session.snapshot.symbol,
       session.outcome,
-      session.evidenceIntegrity.status,
+      session.evidenceValidation.validationStatus,
       session.execution.status,
       JSON.stringify(session),
     );
   }
 
-  list(): DemoSession[] {
+  list(): RecordedSession[] {
     const rows = this.db
       .prepare(
         "SELECT data_json FROM sessions ORDER BY datetime(created_at) DESC",
       )
       .all() as Array<{ data_json: string }>;
 
-    return rows.map((row) => JSON.parse(row.data_json) as DemoSession);
+    return rows
+      .map((row) => JSON.parse(row.data_json) as unknown)
+      .filter(isRecordedSession);
   }
 
-  get(sessionId: string): DemoSession | null {
+  get(sessionId: string): RecordedSession | null {
     const row = this.db
       .prepare("SELECT data_json FROM sessions WHERE session_id = ?")
       .get(sessionId) as { data_json: string } | undefined;
 
-    return row ? (JSON.parse(row.data_json) as DemoSession) : null;
+    if (!row) {
+      return null;
+    }
+
+    const session = JSON.parse(row.data_json) as unknown;
+    return isRecordedSession(session) ? session : null;
   }
 
   close(): void {
     this.db.close();
   }
+}
+
+function isRecordedSession(value: unknown): value is RecordedSession {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<RecordedSession>;
+  return Boolean(
+    candidate.snapshot &&
+      candidate.evidenceValidation &&
+      Array.isArray(candidate.rebuttals),
+  );
 }

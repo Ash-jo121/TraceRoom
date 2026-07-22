@@ -1,21 +1,16 @@
 # Demo Script
 
-## 4-Minute Flow
+## Current Healthy-Run Flow
 
-0:00-0:20 Command Center and pitch.
+1. Open the TraceRoom Command Center.
+2. Click **Run Healthy Session**.
+3. Explain that the shared ACME snapshot is being sent to three configured agents.
+4. Open the returned session and inspect the generated proposals and final votes.
+5. Copy the trace ID from the Audit tab.
+6. Open SigNoz and show the 27-span `debate.session` trace.
+7. Walk through snapshot, proposal/LLM, evidence, rebuttal/LLM, final-vote/LLM, consensus, and risk spans.
+8. Close with: “TraceRoom does not promise autonomous financial agents will always be right. It makes sure they can never be opaque.”
 
-0:20-0:55 Run a healthy decision session.
-
-0:55-1:20 Show SigNoz trace or explain the session-id search hint.
-
-1:20-2:05 Run the fault-injected session and open Decision Detail.
-
-2:05-2:40 Click Replay Incident and show the evidence failure sequence.
-
-2:40-3:15 Open Auditor Panel and export the Proof Pack.
-
-3:15-3:45 Show dashboard and alert setup docs.
-
-3:45-4:00 Closing line:
-
-TraceRoom does not promise autonomous financial agents will always be right. It makes sure they can never be opaque.
+The evidence-fault, risk-veto, error, and deadlock flows will be added as
+separate replay scenarios. Live and paper trading are not part of the current
+demo path.

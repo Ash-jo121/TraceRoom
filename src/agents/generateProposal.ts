@@ -6,6 +6,7 @@ import { env } from "../config/env";
 import { llmClient } from "../llm/llmClient";
 import { toApiMessage } from "../llm/toApiMessage";
 import { withLlmCall } from "../llm/withLlmCall";
+import { zodResponseFormat } from "openai/helpers/zod.mjs";
 
 export async function generateProposal(
   agent: AgentConfig,
@@ -22,27 +23,24 @@ export async function generateProposal(
       snapshotId: snapshot.snapshotId,
     },
     () =>
-      llmClient.chat.completions.create({
+      llmClient.chat.completions.parse({
         model: env.LLM_MODEL,
         messages: apiMessages,
-        response_format: {
-          type: "json_object",
-        },
+        response_format: zodResponseFormat(
+          ProposalContentSchema,
+          "agent_proposal",
+        ),
       }),
   );
 
-  const rawContent = completion.choices[0].message.content;
+  const validatedContent = completion.choices[0].message.parsed;
 
-  if (!rawContent) {
-    throw new Error("LLM returned an empty proposal");
+  if (!validatedContent) {
+    throw new Error("LLM returned an empty or refused proposal");
   }
 
-  const parsedContent: unknown = JSON.parse(rawContent);
-
-  const validateContent = ProposalContentSchema.parse(parsedContent);
-
   return {
-    ...validateContent,
+    ...validatedContent,
     agentId: agent.agentId,
     snapshotId: snapshot.snapshotId,
   };

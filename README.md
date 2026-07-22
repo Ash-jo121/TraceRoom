@@ -1,61 +1,76 @@
 # TraceRoom
 
-TraceRoom is a black box recorder for autonomous financial agents. It captures agent evidence, proposals, critiques, votes, risk checks, execution attempts, SigNoz telemetry, incident replay, and audit proof packs.
+TraceRoom is a decision-observability and audit platform for autonomous
+financial agents. It turns every proposed financial action into a traceable,
+inspectable, and replayable decision record backed by SigNoz.
 
-## Demo Stack
+The multi-agent financial workflow is the instrumented workload, not the
+product. TraceRoom is the audit and governance layer around that workload;
+SigNoz provides the traces, correlated logs, metrics, dashboards, and alerts
+used to investigate its behavior.
 
-- Node/TypeScript API
+No real trades, broker credentials, or live order placement are used.
+
+```text
+Agents recommend.
+Consensus selects.
+The risk engine governs.
+TraceRoom audits.
+SigNoz makes the evidence observable.
+```
+
+## Stack
+
+- Node/TypeScript API and agent pipeline
 - React/Vite frontend
 - SQLite persistence using Node's built-in `node:sqlite`
-- OpenTelemetry traces, logs, and metrics for SigNoz
-- Foundry `casting.yaml` and `casting.yaml.lock`
+- OpenTelemetry traces, logs, and metrics exported to SigNoz
+- Foundry deployment files: `casting.yaml` and `casting.yaml.lock`
 
 ## Run Locally
 
-Install dependencies if needed:
+Install dependencies:
 
 ```bash
 npm install
+npm --prefix frontend install
 ```
 
-Start the API:
+Configure the LLM variables in `.env`, start SigNoz/Foundry, then run:
 
 ```bash
-npm run api
-```
-
-Start the frontend:
-
-```bash
-cd frontend
-npm install
 npm run dev
 ```
 
-Open the frontend and run a healthy or fault session. The fault demo uses the deterministic `INFY_EVIDENCE_INTEGRITY_V1` fixture.
+Open `http://127.0.0.1:5173` and click **Run Healthy Session**. The frontend
+calls the Node API, which feeds `snapshot-001` for `ACME` into the real agent
+pipeline. A successful run persists the stage outputs and emits a fresh
+27-span `debate.session` trace.
 
-## Fault Demo Story
+The API and frontend can also be started separately:
 
-In the fault session, Momentum Agent receives a corrupted market price:
+```bash
+npm run api
+npm --prefix frontend run dev
+```
 
-- Momentum cited price: `1819.26`
-- Authoritative INFY price: `1684.50`
-- Deviation: `8.00%`
-- Allowed tolerance: `2.00%`
-- Failed rule: `EVIDENCE_INTEGRITY`
-- Result: `VETOED - EXECUTION BLOCKED`
+The Vite server proxies `/api` to `http://127.0.0.1:8787`. Set
+`VITE_API_BASE_URL` when the API is hosted elsewhere. Run a single ACME session
+without the UI with `npm run run:once`.
 
-No real trades are placed. Execution is synthetic only.
+## Current Scenario Status
+
+- Healthy ACME agent run: wired and verified
+- Evidence-fault run: pending completion
+- Risk-veto run: pending completion
+- Error run: pending completion
+- Deadlock run: pending completion
+- Live and paper trading: deprioritized
 
 ## SigNoz
 
-TraceRoom includes `casting.yaml` and `casting.yaml.lock`. The API emits OpenTelemetry when an OTLP-compatible collector is available at the configured endpoint.
-
-See:
-
-- `docs/SIGNOZ_SETUP.md`
-- `docs/TELEMETRY_MAP.md`
-- `docs/DEMO_SCRIPT.md`
+The API exports OTLP/HTTP telemetry to `http://127.0.0.1:4318` by default.
+See `docs/SIGNOZ_SETUP.md` and `docs/TELEMETRY_MAP.md`.
 
 ## AI Disclosure
 

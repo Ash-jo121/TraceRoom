@@ -1,6 +1,6 @@
 # SigNoz Setup
 
-TraceRoom includes Foundry files for SigNoz:
+TraceRoom includes Foundry deployment files:
 
 - `casting.yaml`
 - `casting.yaml.lock`
@@ -13,31 +13,49 @@ foundryctl forge -f casting.yaml
 foundryctl cast -f casting.yaml
 ```
 
-Expected local URLs:
+Expected local endpoints:
 
 - SigNoz UI: `http://localhost:8080`
 - SigNoz MCP: `http://localhost:8000`
+- OTLP/HTTP collector: `http://127.0.0.1:4318`
 
-## Dashboard: Decision Integrity
+When Foundry runs inside WSL, ensure port `4318` is exposed to Windows.
 
-Create a dashboard with Query Builder panels for:
+## Verify A UI-Triggered ACME Trace
+
+1. Run `npm run dev` from the repository root.
+2. Open `http://127.0.0.1:5173`.
+3. Click **Run Healthy Session**.
+4. Copy the trace ID printed by the API or shown in the Audit tab.
+5. Search the `traceroom-debate-simulation` service for that trace ID.
+
+The expected root is `debate.session`. A successful healthy run has 27 spans:
+
+- `market.snapshot` and `market.quote`
+- `debate.round.proposal`, three `agent.proposal`, and three `llm.call`
+- `evidence.validation`
+- `debate.round.cross_examination`, three `agent.rebuttal`, and three `llm.call`
+- `debate.round.final_vote`, three `agent.final_vote`, and three `llm.call`
+- `consensus.resolve`
+- `risk.review`
+
+The separate `decision.evaluation` trace links back to the debate trace.
+Batch export can take a few seconds before a trace appears in SigNoz.
+
+## Suggested Dashboard Panels
 
 - decisions by outcome
-- P95 decision latency
+- P95 debate latency
 - risk veto rate
-- evidence integrity violations
-- average evidence integrity score
-- workflow integrity violations
-- token usage/cost by agent
-- proof packs exported
+- evidence-integrity violations
+- LLM latency and cost by agent/stage
+- final-vote changes
+- decision regret
 
-## Alerts
+## Suggested Alerts
 
-Suggested alerts:
-
-- Evidence integrity critical: evidence violation count greater than `0` or status `CRITICAL`
-- Workflow integrity critical: execution attempted without approved risk review
-- Deadlock: outcome equals `DEADLOCKED`
-- Session cost budget: total session cost greater than `0.20`
-
-Alerts are observability responses. The risk engine blocks synchronously before alerts evaluate.
+- evidence validation status is not `valid`
+- risk review status is `VETOED`
+- consensus status is `DEADLOCKED`
+- LLM call or debate session has error status
+- session cost exceeds the configured budget

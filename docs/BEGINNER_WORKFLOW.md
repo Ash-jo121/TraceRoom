@@ -1,273 +1,215 @@
 # TraceRoom Beginner Workflow
 
-This guide explains TraceRoom for someone who has never seen the project, does not know the hackathon plan, and does not know stock-market terms.
+This guide explains the product without assuming knowledge of autonomous
+agents, financial markets, or observability systems.
 
-## The Idea In One Minute
+## The Product In One Minute
 
-TraceRoom is a recorder for automated decision-making systems.
+TraceRoom is a **decision-observability and audit platform for autonomous
+financial agents**. It turns a proposed financial action into a traceable,
+inspectable, and replayable decision record.
 
-Imagine a team of AI helpers is allowed to recommend a financial action. Before anything happens, TraceRoom records:
+The financial-agent workflow is not the product. It is the system TraceRoom
+observes during the hackathon demo. The product is the audit and governance
+layer around that workflow, together with the SigNoz observability surfaces
+used to investigate it.
 
-- what information each helper saw
-- what each helper recommended
-- whether the information was trustworthy
-- whether safety rules approved the decision
-- why the final action was allowed or blocked
+```text
+Agents recommend.
+Consensus selects.
+The risk engine governs.
+TraceRoom audits.
+SigNoz makes the evidence observable.
+```
 
-The demo is not real trading. It uses fake, fixed data so the story is repeatable every time.
+Target users are fintech engineering, quantitative research, risk, compliance,
+and platform teams operating autonomous financial agents. TraceRoom is not a
+stock-tip application for retail investors.
 
-## What Problem TraceRoom Solves
+## Why TraceRoom Exists
 
-Autonomous systems can make decisions quickly, but that creates a question:
+Autonomous agents can call models, cite evidence, disagree, change their votes,
+and recommend an action in seconds. When something goes wrong, an operator must
+be able to answer:
 
-> If the system made a bad or risky decision, can we prove exactly why it happened?
+- What common market data did the agents receive?
+- What did each agent initially recommend?
+- Which evidence supported each argument, and was it valid?
+- What changed during cross-examination?
+- How was consensus reached, or why did the room deadlock?
+- Which deterministic risk rule approved or vetoed the decision?
+- Which model call was slow, expensive, malformed, or responsible for failure?
+- Can the full incident be reconstructed from operational evidence?
 
-TraceRoom answers that question. It acts like a flight recorder for AI decisions.
+TraceRoom records those answers instead of leaving the agent system as a black
+box.
 
-In the demo, one AI helper receives the wrong price for a company. TraceRoom catches the mismatch before execution and blocks the action.
+## Why SigNoz Is Central
+
+TraceRoom uses OpenTelemetry to send decision evidence to SigNoz. Each SigNoz
+feature answers a different operational question.
+
+### Traces
+
+The decision trace shows the complete causal workflow: market snapshot,
+proposal calls, evidence validation, cross-examination, final votes, consensus,
+and risk review. Operators can see ordering, parent-child relationships,
+latency, and failures in one place.
+
+### Logs
+
+Correlated logs contain readable stage results such as agent positions,
+confidence, evidence, critiques, vote changes, and risk outcomes. Session and
+trace identifiers connect those logs to the exact workflow that produced them.
+
+### Metrics
+
+Metrics aggregate behavior across many sessions: LLM latency, token use, cost,
+evidence-validation rate, risk-veto rate, deadlock rate, decision outcomes, and
+decision regret.
+
+### Dashboards
+
+The Decision Integrity dashboard summarizes decision health and governance.
+The Agent Reliability dashboard compares agent latency, cost, failures,
+evidence quality, and usefulness over time.
+
+### Alerts
+
+Alerts notify operators about evidence-integrity violations, workflow-integrity
+violations, deadlocks, session-cost overruns, and model failures. Alerts report
+incidents; the deterministic risk engine remains responsible for synchronous
+blocking.
+
+### SigNoz MCP
+
+Ask the Auditor will use the SigNoz MCP server to reconstruct a decision from
+telemetry. It must answer from observable evidence rather than from the
+TraceRoom operational database.
+
+## What TraceRoom Owns
+
+TraceRoom owns:
+
+- session orchestration and correlation identifiers
+- the shared market snapshot record
+- agent-stage and evidence records
+- deterministic evidence validation
+- consensus and risk-governance results
+- replay and human-readable decision views
+- deep links into supporting SigNoz evidence
+
+TraceRoom does not rebuild SigNoz Trace Explorer. Its own UI explains the
+decision in domain language, while SigNoz remains the place for deep technical
+investigation, aggregate dashboards, metrics, logs, and alerts.
+
+## Current Instrumented Workload
+
+The current healthy replay uses:
+
+- snapshot: `snapshot-001`
+- symbol: `ACME`
+- horizon: 30 minutes
+- agents: Momentum Scout, Mean Reversion Analyst, and Market Skeptic
+
+This fixed replay input keeps the workflow repeatable outside market hours. The
+configured LLM still generates the proposal, rebuttal, and final-vote content;
+those outputs are not prewritten UI fixtures.
+
+## Healthy Session Flow
+
+1. The user clicks **Run Healthy Session**.
+2. TraceRoom creates a correlated session identifier.
+3. The API loads the shared ACME replay snapshot.
+4. All three agents receive the same snapshot.
+5. Each agent makes an LLM call and submits a sealed proposal.
+6. TraceRoom validates every cited value against the shared snapshot.
+7. Each agent cross-examines the other two proposals through another LLM call.
+8. Each agent submits a final vote through a third LLM call.
+9. Consensus selects a majority position or reports a deadlock.
+10. The deterministic risk engine approves, vetoes, or records no executable trade.
+11. The real stage outputs are persisted to SQLite for the TraceRoom UI.
+12. OpenTelemetry sends traces, logs, and metrics to SigNoz.
+13. The user can inspect the domain view in TraceRoom or open the supporting evidence in SigNoz.
+
+A successful healthy workflow currently produces a 27-span `debate.session`
+trace plus a separately linked `decision.evaluation` trace when evaluation is
+applicable.
+
+## What The User Sees
+
+### TraceRoom Command Center
+
+The Command Center provides the domain-level audit view:
+
+- recorded sessions and outcomes
+- shared snapshot values
+- evidence-validation summary
+- consensus and risk verdict
+- generated proposals and final votes
+- ordered replay stages
+- session, trace, and log correlation identifiers
+- actions to investigate the supporting evidence in SigNoz
+
+### SigNoz Investigation
+
+SigNoz provides the engineering and operational view:
+
+- the complete decision trace and LLM-call hierarchy
+- errors and latency by stage
+- correlated structured logs
+- token, cost, reliability, and outcome metrics
+- Decision Integrity and Agent Reliability dashboards
+- alerts for unsafe or abnormal sessions
 
 ## Tiny Glossary
 
-**Stock**
+**Agent** — An autonomous component that examines the shared snapshot and
+returns a recommendation.
 
-A small ownership piece of a company. In this demo, no stock is actually bought or sold.
+**Market snapshot** — The common, fixed input all agents must use for a replay.
 
-**Ticker**
+**Evidence** — A cited value and statement supporting an agent argument.
 
-A short code for a company. The demo uses `INFY`, which represents Infosys.
+**Evidence validation** — A deterministic comparison between cited values and
+the authoritative snapshot.
 
-**Price**
+**Consensus** — The majority result after final votes.
 
-The amount one share is worth in the demo data.
+**Risk review** — Deterministic governance that approves or vetoes a proposed
+action after consensus.
 
-**Agent**
+**Trace** — A causal timeline of one decision workflow and its child operations.
 
-An AI helper that looks at the same situation and gives a recommendation.
+**Log** — A structured event containing readable detail about a workflow stage.
 
-**Evidence**
+**Metric** — A numeric measurement aggregated across sessions, such as latency,
+cost, veto rate, or validation rate.
 
-The facts an agent uses to justify its recommendation.
+**Alert** — A SigNoz rule that notifies operators when telemetry shows a problem.
 
-**Authoritative price**
+**Replay** — A repeatable run using a fixed historical or simulated snapshot.
 
-The trusted price TraceRoom uses as the source of truth.
+## Upcoming Replay Scenarios
 
-**Cited price**
+- evidence-integrity failure
+- deterministic risk veto
+- LLM or workflow error
+- consensus deadlock
+- human-readable Debate tab
+- SigNoz MCP-backed Ask the Auditor
 
-The price an agent claims it saw.
+Live-market and paper-trading modes are deprioritized. They are potential data
+sources for TraceRoom, not the core product.
 
-**Deviation**
+## What To Say During The Demo
 
-How far the cited price is from the trusted price.
+> TraceRoom is the audit layer for autonomous financial agents. The agents make
+> a decision, TraceRoom records and governs the lifecycle, and SigNoz gives us
+> the traces, logs, metrics, dashboards, and alerts needed to prove exactly what
+> happened.
 
-**Tolerance**
+Closing line:
 
-The maximum mismatch TraceRoom will allow before calling the evidence unsafe.
-
-**Risk review**
-
-A safety check that decides whether execution is allowed.
-
-**Execution**
-
-In this project, execution means a fake simulated action. It never places a real trade.
-
-**Proof Pack**
-
-A downloadable audit summary that explains what happened and why.
-
-**SigNoz**
-
-An observability tool used to inspect traces, logs, and metrics. In plain language, it helps you see what happened inside the system.
-
-## The Demo Story
-
-TraceRoom has two main demo paths.
-
-## Healthy Session
-
-A healthy session is the normal case.
-
-1. The user clicks **Run Healthy Session**.
-2. TraceRoom creates a new recorded session.
-3. The trusted price for `INFY` is `1684.50`.
-4. All agents use evidence that matches the trusted price.
-5. TraceRoom checks the evidence.
-6. The evidence passes.
-7. The risk review approves the session.
-8. TraceRoom marks the fake execution as completed.
-
-What this proves:
-
-TraceRoom can record a clean decision from start to finish.
-
-## Fault Session
-
-A fault session is the important demo.
-
-1. The user clicks **Run Fault Session**.
-2. TraceRoom creates a new recorded session.
-3. The trusted price for `INFY` is still `1684.50`.
-4. One agent, called **Momentum Agent**, receives a corrupted price: `1819.26`.
-5. Momentum Agent cites `1819.26` as evidence.
-6. TraceRoom compares that cited price against the trusted price.
-7. The mismatch is `8.00%`.
-8. The allowed tolerance is only `2.00%`.
-9. TraceRoom marks `EVIDENCE_INTEGRITY` as failed.
-10. The risk review vetoes the session.
-11. Execution is blocked.
-
-What this proves:
-
-TraceRoom can catch bad evidence before an autonomous system acts on it.
-
-## What The User Sees In The App
-
-### Command Area
-
-The left side shows:
-
-- buttons to run healthy or fault sessions
-- a filter for all, healthy, or fault sessions
-- previous recorded sessions
-
-### Decision Detail
-
-This is the main screen for a selected session.
-
-For the fault session, the key values are:
-
-- Momentum claim: `1819.26`
-- Authoritative price: `1684.50`
-- Deviation: `8.00%`
-- Tolerance: `2.00%`
-- Failed rule: `EVIDENCE_INTEGRITY`
-- Result: `EXECUTION BLOCKED`
-
-A judge should understand the failure from this screen in under 10 seconds.
-
-### Overview Tab
-
-This tab explains the final result.
-
-It shows:
-
-- whether the session was executed or blocked
-- the Evidence Integrity Score
-- the consensus result
-- the safety rules that passed or failed
-- the lifecycle timeline
-
-### Agents Tab
-
-This tab shows what each AI helper recommended.
-
-The demo agents are:
-
-- Momentum Agent
-- Relative Value Agent
-- Contrarian Agent
-
-You do not need to understand their trading styles. For the demo, the important part is that one of them used bad evidence and TraceRoom caught it.
-
-### Replay Tab
-
-This tab walks through the incident one step at a time.
-
-For the fault session, it explains:
-
-1. The trusted market snapshot was captured.
-2. Momentum Agent received the corrupted price.
-3. Momentum Agent cited the wrong price.
-4. TraceRoom checked the trusted price.
-5. TraceRoom calculated the mismatch.
-6. The mismatch exceeded the allowed tolerance.
-7. The safety rule failed.
-8. Execution was blocked.
-9. Telemetry recorded the incident.
-
-### Audit Tab
-
-This tab is for someone reviewing the decision later.
-
-It includes:
-
-- a plain-language answer from the Auditor Panel
-- a SigNoz trace link or search hint
-- an Audit Proof Pack export
-- a markdown preview of the proof pack
-
-## What Happens Behind The Scenes
-
-When a session runs, TraceRoom does this:
-
-1. Creates a session ID.
-2. Loads the fixed `INFY` demo data.
-3. Builds three agent recommendations.
-4. Runs a final vote.
-5. Checks evidence against the trusted fixture.
-6. Calculates an evidence score.
-7. Runs risk rules.
-8. Allows or blocks fake execution.
-9. Saves the full session to SQLite.
-10. Emits telemetry for SigNoz.
-11. Makes the session available in the UI.
-
-## Why The Fault Is Blocked
-
-The fault is blocked because the agent's claim is too far away from the trusted price.
-
-The trusted price is:
-
-```text
-1684.50
-```
-
-Momentum Agent claimed:
-
-```text
-1819.26
-```
-
-That is an `8.00%` difference.
-
-TraceRoom only allows a `2.00%` difference.
-
-Because `8.00%` is larger than `2.00%`, TraceRoom fails the `EVIDENCE_INTEGRITY` rule and blocks execution.
-
-## What Makes This A Good Demo
-
-The demo is strong because it is simple:
-
-- one trusted number
-- one corrupted number
-- one clear mismatch
-- one failed safety rule
-- one blocked execution
-- one proof pack explaining why
-
-It shows the product idea without needing real markets, real trades, or a complex model.
-
-## What To Say When Explaining TraceRoom
-
-Use this short explanation:
-
-> TraceRoom records how autonomous financial agents make decisions. In this demo, one agent sees a corrupted price. TraceRoom compares that claim against the trusted price, detects an 8% mismatch where only 2% is allowed, fails the evidence-integrity rule, and blocks execution. Then it gives auditors a replay and proof pack showing exactly what happened.
-
-## What TraceRoom Does Not Do
-
-TraceRoom does not:
-
-- place real trades
-- connect to broker accounts
-- use real money
-- promise that agents are always correct
-- replace human review
-
-TraceRoom does:
-
-- record decisions
-- explain failures
-- block unsafe execution
-- create audit evidence
-- connect the product story to SigNoz telemetry
+> TraceRoom does not promise autonomous financial agents will always be right.
+> It makes sure they can never be opaque.

@@ -1,21 +1,39 @@
 # TraceRoom Product Spec
 
-TraceRoom is a black box recorder for autonomous financial agents. It records the full decision trail for a synthetic trading decision: market snapshot, agent proposals, cross-examination, final votes, consensus, evidence validation, risk review, execution attempt, incident replay, SigNoz telemetry, and proof pack export.
+TraceRoom is a decision-observability and audit platform for autonomous
+financial agents. It records the full decision trail: shared snapshot,
+independent proposals, cross-examination, final votes, consensus, evidence
+validation, deterministic risk review, evaluation, replay, and supporting
+SigNoz telemetry.
 
-## Demo Fixture
+The financial-agent workflow is the instrumented workload, not the product.
+TraceRoom is the audit and governance layer. SigNoz supplies the traces, logs,
+metrics, dashboards, alerts, and MCP-backed investigation surfaces.
 
-`INFY_EVIDENCE_INTEGRITY_V1` is the canonical demo fixture.
+```text
+Agents recommend.
+Consensus selects.
+The risk engine governs.
+TraceRoom audits.
+```
 
-- Ticker: `INFY`
-- Authoritative reference price: `1684.50`
-- Fault price shown to Momentum Agent: `1819.26`
-- Tolerance: `2.00%`
-- Deviation: `8.00%`
+## Current Replay Fixture
+
+- Snapshot: `snapshot-001`
+- Symbol: `ACME`
+- Current price: `104.50`
+- Previous close: `99.50`
 - Horizon: `30` minutes
-- Synthetic capital: `100000`
+- Agents: Momentum Scout, Mean Reversion Analyst, Market Skeptic
 
-## Demo Outcomes
+The snapshot is passed to the configured LLM agents. Their validated structured
+outputs—not prewritten demo proposals—are persisted and returned to the UI.
 
-Healthy sessions pass evidence integrity and execute synthetically.
+## Current Outcome
 
-Fault sessions fail evidence integrity, receive a risk veto, and are blocked before execution.
+The healthy session validates agent evidence against the shared ACME snapshot,
+resolves consensus, applies the deterministic risk policy, and records the
+linked evaluation. No live or paper trade is placed.
+
+Additional replay scenarios for evidence faults, risk vetoes, LLM errors, and
+deadlocks are pending.

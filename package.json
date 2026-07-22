@@ -4,10 +4,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "concurrently --kill-others --names api,ui --prefix-colors cyan,magenta \"npm run api\" \"npm --prefix frontend run dev\"",
+    "run:once": "tsx src/index.ts",
     "api": "tsx src/api/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/demo/testDemoSession.ts",
+    "test": "tsx src/session/testSession.ts",
     "trace:test": "tsx src/telemetry/testTrace.ts"
   },
   "keywords": [],
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "concurrently": "^10.0.3",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2"
   }

@@ -3,3 +3,4 @@ node_modules
 .pnpm-store
 data
 frontend/dist
+data/traceroom.sqlite

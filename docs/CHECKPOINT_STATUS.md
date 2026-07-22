@@ -1,27 +1,34 @@
 # Checkpoint Status
 
-Current target: revised Node/TypeScript implementation of the 0-to-100 plan.
+Current target: ACME replay sessions driven by the real three-agent LLM
+pipeline and recorded in SigNoz.
 
 ## Completed
 
-- Existing TypeScript agent/telemetry prototype preserved.
 - Foundry files exist: `casting.yaml`, `casting.yaml.lock`.
-- Deterministic INFY demo service added.
-- Node API added for sessions and proof packs.
-- SQLite persistence added.
-- React/Vite frontend added.
-- Decision Detail shows the canonical evidence failure.
+- ACME `snapshot-001` market fixture feeds the agent pipeline.
+- Three proposal, rebuttal, and final-vote stages execute through the configured LLM.
+- Evidence validation, consensus, risk review, and linked evaluation are traced.
+- Node API persists real stage outputs to SQLite.
+- React/Vite healthy-session action calls the API through `/api`.
+- Root `npm run dev` starts the API and frontend together.
+- A UI-triggered healthy run produces the expected 27-span `debate.session` trace.
 
-## Demo Path
+## Working Demo Path
 
-1. Run `npm run api`.
-2. Run `cd frontend && npm install && npm run dev`.
-3. Click `Run Fault Session`.
-4. Open the session detail.
-5. Confirm the UI shows `1819.26`, `1684.50`, `8.00%`, `2.00%`, `EVIDENCE_INTEGRITY`, and `EXECUTION BLOCKED`.
+1. Run `npm install` and `npm --prefix frontend install` once.
+2. Start Foundry/SigNoz and confirm OTLP port `4318` is exposed.
+3. Run `npm run dev` from the repository root.
+4. Open `http://127.0.0.1:5173`.
+5. Click **Run Healthy Session**.
+6. Copy the trace ID from the API output or Audit tab.
+7. Open the `debate.session` trace in SigNoz and inspect all 27 spans.
 
-## Known Gaps
+## Pending
 
-- SigNoz MCP live Auditor integration is optional and not required for the local demo.
-- Dashboard and alert setup are documented for manual reproduction.
-- Real LLM mode remains separate from the deterministic demo flow.
+- Evidence-fault, risk-veto, error, and deadlock replay sessions.
+- Human-readable Debate tab.
+- SigNoz MCP Auditor integration from the teammate branch.
+- Final dashboards and alerts.
+
+Live market trading and paper trading are intentionally deprioritized.

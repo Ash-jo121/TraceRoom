@@ -1,8 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { buildAuditorSummary, buildProofPack } from "../demo/proofPack";
-import { runDemoSession } from "../demo/runDemoSession";
-import type { SessionMode } from "../demo/types";
 import { SessionStore } from "../persistence/sessionStore";
+import { runDebateSession } from "../session/runDebateSession";
+import type { SessionMode } from "../session/types";
 import { telemetrySdk } from "../telemetry/tracing";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -62,8 +61,11 @@ async function route(
 
   if (request.method === "POST" && pathname === "/sessions/run") {
     const mode = parseMode(requestUrl.searchParams.get("mode"));
-    const session = await runDemoSession(mode);
+    const session = await runDebateSession(mode);
     store.save(session);
+    console.log(
+      `Session completed: mode=${session.mode} sessionId=${session.sessionId} traceId=${session.signoz.traceId} outcome=${session.outcome}`,
+    );
     sendJson(response, 201, session);
     return;
   }
@@ -84,38 +86,6 @@ async function route(
     return;
   }
 
-  const proofPackMatch = pathname.match(/^\/sessions\/([^/]+)\/proof-pack$/);
-  if (request.method === "GET" && proofPackMatch) {
-    const session = store.get(decodeURIComponent(proofPackMatch[1]));
-    if (!session) {
-      sendJson(response, 404, { error: "Session not found" });
-      return;
-    }
-    sendJson(response, 200, await buildProofPack(session));
-    return;
-  }
-
-  const auditorMatch = pathname.match(/^\/sessions\/([^/]+)\/auditor$/);
-  if (request.method === "GET" && auditorMatch) {
-    const session = store.get(decodeURIComponent(auditorMatch[1]));
-    if (!session) {
-      sendJson(response, 404, { error: "Session not found" });
-      return;
-    }
-    sendJson(response, 200, {
-      mode: "Demo Fallback",
-      answer: buildAuditorSummary(session),
-      supportedQuestions: [
-        "Why was this session blocked?",
-        "Which agent caused the evidence integrity failure?",
-        "What evidence did the risk engine reject?",
-        "Was execution allowed?",
-        "Export the audit summary.",
-      ],
-    });
-    return;
-  }
-
   sendJson(response, 404, { error: "Not found" });
 }
 
@@ -123,7 +93,7 @@ function parseMode(value: string | null): SessionMode {
   if (value === "healthy" || value === "fault") {
     return value;
   }
-  return "fault";
+  return "healthy";
 }
 
 function applyCors(response: ServerResponse): void {
@@ -139,6 +109,7 @@ function sendJson(
 ): void {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
   });
   response.end(JSON.stringify(body, null, 2));
 }
