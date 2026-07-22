@@ -1,0 +1,25 @@
+{
+  "name": "traceroom-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "build": "node node_modules/typescript/lib/tsc.js --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173"
+  },
+  "dependencies": {
+    "@astryxdesign/core": "^0.1.6",
+    "@astryxdesign/theme-neutral": "^0.1.6",
+    "@vitejs/plugin-react": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.0.0"
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "^0.1.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
