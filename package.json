@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "api": "tsx src/api/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "tsx src/demo/testDemoSession.ts",
     "trace:test": "tsx src/telemetry/testTrace.ts"
   },
   "keywords": [],

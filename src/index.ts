@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { agentConfigs } from "./config/agents";
 import { runProposalStage } from "./debate/runProposalStage";
 import { marketSnapshot } from "./fixtures/marketSnapshot";
@@ -40,12 +41,22 @@ try {
 
   process.exitCode = 1;
 } finally {
-  await telemetrySdk.shutdown();
-  console.log("Telemetry SDK shutdown complete");
+  try {
+    await telemetrySdk.shutdown();
+    console.log("Telemetry SDK shutdown complete");
+  } catch (error) {
+    console.warn(
+      "Telemetry SDK shutdown failed; continuing because the debate run completed.",
+    );
+
+    if (error instanceof Error) {
+      console.warn("Telemetry error message:", error.message);
+    }
+  }
 }
 
 async function runDebateSession() {
-  const sessionId = crypto.randomUUID();
+  const sessionId = randomUUID();
 
   const debateResult = await withSpan("debate.session", async (sessionSpan) => {
     sessionSpan.setAttributes({

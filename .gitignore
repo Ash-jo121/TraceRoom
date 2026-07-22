@@ -1,2 +1,5 @@
 node_modules
 .env
+.pnpm-store
+data
+frontend/dist
