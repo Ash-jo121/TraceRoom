@@ -11,15 +11,15 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
 const traceExporter = new OTLPTraceExporter({
-  url: "http://localhost:4318/v1/traces",
+  url: "http://127.0.0.1:4318/v1/traces",
 });
 
 const logExporter = new OTLPLogExporter({
-  url: "http://localhost:4318/v1/logs",
+  url: "http://127.0.0.1:4318/v1/logs",
 });
 
 const metricExporter = new OTLPMetricExporter({
-  url: "http://localhost:4318/v1/metrics",
+  url: "http://127.0.0.1:4318/v1/metrics",
   temporalityPreference: AggregationTemporality.DELTA,
 });
 
