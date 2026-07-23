@@ -88,7 +88,11 @@ function isRecordedSession(value: unknown): value is RecordedSession {
 
   const candidate = value as Partial<RecordedSession>;
   return Boolean(
-    candidate.snapshot &&
+    candidate.schemaVersion === 4 &&
+      candidate.scenarioInjection &&
+      candidate.stageStatuses &&
+      candidate.pipelineGate &&
+      candidate.snapshot &&
       candidate.evidenceValidation &&
       Array.isArray(candidate.rebuttals),
   );

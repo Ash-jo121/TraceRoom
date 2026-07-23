@@ -29,11 +29,19 @@ TraceRoom audits.
 The snapshot is passed to the configured LLM agents. Their validated structured
 outputs—not prewritten demo proposals—are persisted and returned to the UI.
 
-## Current Outcome
+## Current Replay Outcomes
 
-The healthy session validates agent evidence against the shared ACME snapshot,
-resolves consensus, applies the deterministic risk policy, and records the
-linked evaluation. No live or paper trade is placed.
+The UI and API expose five real-agent replay paths:
 
-Additional replay scenarios for evidence faults, risk vetoes, LLM errors, and
-deadlocks are pending.
+- healthy decision processing
+- controlled evidence-integrity failure
+- controlled deterministic risk veto
+- controlled post-stage workflow error
+- controlled consensus deadlock
+
+All paths send the ACME snapshot through the configured proposal LLM calls.
+Healthy, risk-veto, error, and deadlock continue through rebuttal and final
+voting. Evidence-fault terminates immediately after deterministic validation
+fails, leaving those downstream stages explicitly not run. Scenario controls
+are disclosed in the replay and telemetry and make the incident demonstrations
+repeatable. No live or paper trade is placed.

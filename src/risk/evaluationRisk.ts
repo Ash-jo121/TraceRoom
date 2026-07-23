@@ -6,6 +6,7 @@ export type RiskReviewStatus = "APPROVED" | "VETOED" | "DEADLOCKED";
 
 export type RiskRuleId =
   | "CONSENSUS_REQUIRED"
+  | "EVIDENCE_INTEGRITY"
   | "MARKET_DATA_INTEGRITY"
   | "MAX_INTRADAY_RANGE"
   | "MAX_PRICE_MOVE"
@@ -50,7 +51,27 @@ export function evaluateRisk(
   consensus: ConsensusResult,
   snapshot: MarketSnapshot,
   policy: Readonly<RiskPolicy> = DEFAULT_RISK_POLICY,
+  evidenceBlocked = false,
 ): RiskReviewResult {
+  if (evidenceBlocked) {
+    return {
+      status: "VETOED",
+      position: consensus.position,
+      tradeAllowed: false,
+      unanimous: consensus.unanimous,
+      supportingAgentCount: consensus.supportingAgentIds.length,
+      triggeredRuleIds: ["EVIDENCE_INTEGRITY"],
+      rules: [
+        {
+          ruleId: "EVIDENCE_INTEGRITY",
+          outcome: "TRIGGERED",
+          message:
+            "At least one cited evidence value failed validation against the shared market snapshot.",
+        },
+      ],
+    };
+  }
+
   if (consensus.status === "DEADLOCKED" || consensus.position === null) {
     return {
       status: "DEADLOCKED",
@@ -74,7 +95,7 @@ export function evaluateRisk(
     {
       ruleId: "CONSENSUS_REQUIRED",
       outcome: "PASSED",
-      message: `Consensus resolved to ${consensus.position}.`,
+      message: `The recorded final positions resolved to ${consensus.position}.`,
     },
   ];
 

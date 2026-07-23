@@ -12,9 +12,10 @@ export async function traceRiskReview(
   consensus: ConsensusResult,
   snapshot: MarketSnapshot,
   policy: Readonly<RiskPolicy> = DEFAULT_RISK_POLICY,
+  evidenceBlocked = false,
 ): Promise<RiskReviewResult> {
   return withSpan("risk.review", async (span) => {
-    const result = evaluateRisk(consensus, snapshot, policy);
+    const result = evaluateRisk(consensus, snapshot, policy, evidenceBlocked);
 
     span.setAttributes({
       "market.snapshot.id": snapshot.snapshotId,
@@ -27,6 +28,7 @@ export async function traceRiskReview(
       "risk.triggered_rule_count": result.triggeredRuleIds.length,
       "risk.triggered_rule_ids": [...result.triggeredRuleIds],
       "risk.vetoed": result.status === "VETOED",
+      "evidence.blocked": evidenceBlocked,
 
       "risk.policy.max_intraday_range_pct": policy.maxIntradayRangePct,
 

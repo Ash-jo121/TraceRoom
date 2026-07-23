@@ -190,12 +190,31 @@ cost, veto rate, or validation rate.
 
 **Replay** — A repeatable run using a fixed historical or simulated snapshot.
 
-## Upcoming Replay Scenarios
+## Available Replay Scenarios
 
-- evidence-integrity failure
-- deterministic risk veto
-- LLM or workflow error
-- consensus deadlock
+- **Healthy:** the generated room proceeds without a controlled fault.
+- **Evidence fault:** one generated evidence value is shifted by 8%, validation
+  fails, and `EVIDENCE_INTEGRITY` stops the pipeline. Cross-examination, final
+  voting, consensus, risk review, evaluation, and execution are marked
+  **Not run**.
+- **Risk veto:** the generated stages still run, then the replay transparently
+  normalizes final votes to `LONG` so the stricter `MAX_PRICE_MOVE` policy is
+  exercised.
+- **Error:** the generated stages still run, then a controlled post-stage
+  recording failure creates a persisted, inspectable error session.
+- **Deadlock:** the generated stages still run, then the replay transparently
+  normalizes final votes to `LONG`, `SHORT`, and `NO_TRADE`, producing no
+  majority and triggering `CONSENSUS_REQUIRED`.
+
+The controlled modifications are demo fixtures, not claims that the LLM
+naturally produced those incidents. TraceRoom records them explicitly in the
+session replay and telemetry. The UI labels them **Injected Scenario** and
+shows the generated and forced vote for every agent. SigNoz retains the real
+LLM result on `agent.final_vote` and records the transformation as
+`scenario.vote_override` events on the parent final-vote round.
+
+## Upcoming Product Work
+
 - human-readable Debate tab
 - SigNoz MCP-backed Ask the Auditor
 

@@ -15,14 +15,49 @@ import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { useToast } from "@astryxdesign/core/Toast";
 import { useEffect, useMemo, useState } from "react";
 
-type SessionMode = "healthy" | "fault";
+type SessionScenario =
+  | "healthy"
+  | "evidence-fault"
+  | "risk-veto"
+  | "error"
+  | "deadlock";
+type SessionStageStatus = "COMPLETED" | "BLOCKED" | "SKIPPED" | "ERROR";
 type ActiveTab = "overview" | "agents" | "replay" | "audit";
 
 interface RecordedSession {
+  schemaVersion: 4;
   sessionId: string;
   createdAt: string;
-  mode: SessionMode;
-  scenario: string;
+  mode: SessionScenario;
+  scenario: SessionScenario;
+  scenarioInjection: {
+    injected: boolean;
+    type:
+      | "none"
+      | "evidence-price-deviation"
+      | "directional-risk-veto"
+      | "workflow-recording-error"
+      | "deadlock";
+    description: string;
+    votesOverridden: boolean;
+    voteOverrides: Array<{
+      agentId: string;
+      originalPosition: string;
+      forcedPosition: string;
+      overridden: boolean;
+    }>;
+    evidenceOverride?: {
+      agentId: string;
+      claimIndex: number;
+      originalValue: number;
+      forcedValue: number;
+    };
+    riskPolicyOverride?: {
+      ruleId: "MAX_PRICE_MOVE";
+      originalThreshold: number;
+      scenarioThreshold: number;
+    };
+  };
   snapshot: {
     snapshotId: string;
     symbol: string;
@@ -48,6 +83,22 @@ interface RecordedSession {
     riskAppetite: string;
   }>;
   lifecycle: string[];
+  stageStatuses: {
+    marketSnapshot: SessionStageStatus;
+    proposals: SessionStageStatus;
+    evidenceValidation: SessionStageStatus;
+    crossExamination: SessionStageStatus;
+    finalVote: SessionStageStatus;
+    consensus: SessionStageStatus;
+    riskReview: SessionStageStatus;
+    evaluation: SessionStageStatus;
+  };
+  pipelineGate: {
+    status: "PASSED" | "BLOCKED";
+    blockedAt: "EVIDENCE_VALIDATION" | null;
+    reasonCode: "EVIDENCE_INTEGRITY" | null;
+    message: string;
+  };
   proposals: Array<{
     agentId: string;
     position: string;
@@ -78,7 +129,7 @@ interface RecordedSession {
     supportingAgentIds: string[];
     changedAgentIds: string[];
     dissentingAgentIds?: string[];
-  };
+  } | null;
   evidenceValidation: {
     checkedCount: number;
     validCount: number;
@@ -103,13 +154,18 @@ interface RecordedSession {
       outcome: "PASSED" | "TRIGGERED" | "NOT_APPLICABLE";
       message: string;
     }>;
-  };
+  } | null;
   execution: {
     executionAllowed: boolean;
     status: "READY" | "BLOCKED";
     reason: string;
   };
   outcome: string;
+  error?: {
+    code: string;
+    stage: string;
+    message: string;
+  };
   replay: Array<{
     order: number;
     title: string;
@@ -123,15 +179,14 @@ interface RecordedSession {
   };
 }
 
-const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ?? "/api";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export function App() {
   const toast = useToast();
   const [sessions, setSessions] = useState<RecordedSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loadingMode, setLoadingMode] = useState<SessionMode | null>(null);
-  const [filter, setFilter] = useState<"all" | SessionMode>("all");
+  const [loadingMode, setLoadingMode] = useState<SessionScenario | null>(null);
+  const [filter, setFilter] = useState<"all" | SessionScenario>("all");
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [replayIndex, setReplayIndex] = useState(0);
 
@@ -162,7 +217,9 @@ export function App() {
 
   async function loadSessions() {
     try {
-      const data = await requestJson<RecordedSession[]>(`${apiBaseUrl}/sessions`);
+      const data = await requestJson<RecordedSession[]>(
+        `${apiBaseUrl}/sessions`,
+      );
       setSessions(data);
       setSelectedId((current) => current ?? data[0]?.sessionId ?? null);
     } catch (error) {
@@ -173,27 +230,24 @@ export function App() {
     }
   }
 
-  async function runSession(mode: SessionMode) {
-    setLoadingMode(mode);
+  async function runSession(scenario: SessionScenario) {
+    setLoadingMode(scenario);
     try {
       const session = await requestJson<RecordedSession>(
-        `${apiBaseUrl}/sessions/run?mode=${mode}`,
+        `${apiBaseUrl}/sessions/run?scenario=${scenario}`,
         { method: "POST" },
       );
       setSessions((current) => [session, ...current]);
       setSelectedId(session.sessionId);
       setFilter("all");
       toast({
-        body:
-          mode === "fault"
-            ? "Fault scenario requested."
-            : "Healthy ACME debate completed and traced.",
-        uniqueID: `run-${mode}`,
+        body: scenarioSuccessMessage(session),
+        uniqueID: `run-${scenario}`,
       });
     } catch (error) {
       toast({
-        body: getErrorMessage(error, `Could not run the ${mode} session.`),
-        uniqueID: `run-${mode}-error`,
+        body: getErrorMessage(error, `Could not run the ${scenario} session.`),
+        uniqueID: `run-${scenario}-error`,
       });
     } finally {
       setLoadingMode(null);
@@ -221,11 +275,16 @@ export function App() {
                 Agent audit layer
               </Heading>
               <Text type="supporting">
-                Investigate and govern agent decisions with SigNoz-backed evidence.
+                Investigate and govern agent decisions with SigNoz-backed
+                evidence.
               </Text>
             </VStack>
 
-            <ButtonGroup label="Run session actions" orientation="vertical" size="md">
+            <ButtonGroup
+              label="Run session actions"
+              orientation="vertical"
+              size="md"
+            >
               <Button
                 label="Run Healthy Session"
                 variant="primary"
@@ -234,11 +293,32 @@ export function App() {
                 clickAction={() => runSession("healthy")}
               />
               <Button
-                label="Fault Session (next)"
+                label="Run Evidence Fault"
                 variant="destructive"
-                isLoading={loadingMode === "fault"}
-                isDisabled
-                clickAction={() => runSession("fault")}
+                isLoading={loadingMode === "evidence-fault"}
+                isDisabled={loadingMode !== null}
+                clickAction={() => runSession("evidence-fault")}
+              />
+              <Button
+                label="Run Risk Veto"
+                variant="secondary"
+                isLoading={loadingMode === "risk-veto"}
+                isDisabled={loadingMode !== null}
+                clickAction={() => runSession("risk-veto")}
+              />
+              <Button
+                label="Run Error Session"
+                variant="destructive"
+                isLoading={loadingMode === "error"}
+                isDisabled={loadingMode !== null}
+                clickAction={() => runSession("error")}
+              />
+              <Button
+                label="Run Deadlock"
+                variant="secondary"
+                isLoading={loadingMode === "deadlock"}
+                isDisabled={loadingMode !== null}
+                clickAction={() => runSession("deadlock")}
               />
             </ButtonGroup>
 
@@ -246,7 +326,7 @@ export function App() {
               <Text type="label" color="secondary">
                 Session Filter
               </Text>
-              <ButtonGroup label="Filter sessions" size="sm">
+              <Grid columns={2} gap={1}>
                 <Button
                   label="All"
                   variant={filter === "all" ? "primary" : "secondary"}
@@ -258,11 +338,28 @@ export function App() {
                   clickAction={() => setFilter("healthy")}
                 />
                 <Button
-                  label="Fault"
-                  variant={filter === "fault" ? "primary" : "secondary"}
-                  clickAction={() => setFilter("fault")}
+                  label="Evidence"
+                  variant={
+                    filter === "evidence-fault" ? "primary" : "secondary"
+                  }
+                  clickAction={() => setFilter("evidence-fault")}
                 />
-              </ButtonGroup>
+                <Button
+                  label="Risk"
+                  variant={filter === "risk-veto" ? "primary" : "secondary"}
+                  clickAction={() => setFilter("risk-veto")}
+                />
+                <Button
+                  label="Error"
+                  variant={filter === "error" ? "primary" : "secondary"}
+                  clickAction={() => setFilter("error")}
+                />
+                <Button
+                  label="Deadlock"
+                  variant={filter === "deadlock" ? "primary" : "secondary"}
+                  clickAction={() => setFilter("deadlock")}
+                />
+              </Grid>
             </VStack>
 
             <VStack gap={2}>
@@ -288,12 +385,8 @@ export function App() {
                       <small>{shortId(session.sessionId)}</small>
                     </span>
                     <Badge
-                      label={session.execution.status}
-                      variant={
-                        session.execution.status === "BLOCKED"
-                          ? "error"
-                          : "success"
-                      }
+                      label={session.outcome}
+                      variant={sessionOutcomeVariant(session)}
                     />
                   </button>
                 ))}
@@ -314,7 +407,9 @@ export function App() {
           <VStack gap={5}>
             <Header
               session={selectedSession}
-              onCopySession={() => void copySessionId(selectedSession.sessionId)}
+              onCopySession={() =>
+                void copySessionId(selectedSession.sessionId)
+              }
             />
 
             <Grid columns={{ minWidth: 190, max: 5 }} gap={3}>
@@ -367,9 +462,7 @@ export function App() {
                 setReplayIndex={setReplayIndex}
               />
             )}
-            {activeTab === "audit" && (
-              <AuditTab session={selectedSession} />
-            )}
+            {activeTab === "audit" && <AuditTab session={selectedSession} />}
           </VStack>
         ) : (
           <div className="tr-empty">
@@ -407,30 +500,36 @@ function Header({
           </Text>
           <Badge
             label={session.mode.toUpperCase()}
-            variant={session.mode === "fault" ? "red" : "green"}
+            variant={scenarioBadgeVariant(session.scenario)}
           />
+          {session.scenarioInjection.injected && (
+            <Badge label="INJECTED SCENARIO" variant="orange" />
+          )}
           <Badge
-            label={session.execution.status}
-            variant={session.execution.status === "BLOCKED" ? "error" : "success"}
+            label={session.outcome}
+            variant={sessionOutcomeVariant(session)}
           />
         </HStack>
         <Heading level={2} type="display-2">
           {session.snapshot.symbol} agent debate
         </Heading>
         <HStack gap={3} wrap="wrap">
-          <Text type="supporting">
-            Session {shortId(session.sessionId)}
-          </Text>
+          <Text type="supporting">Session {shortId(session.sessionId)}</Text>
           <Text type="supporting">
             Captured <Timestamp value={session.createdAt} format="date_time" />
           </Text>
           <Text type="supporting">
-            Snapshot {session.snapshot.snapshotId} · {session.snapshot.decisionHorizonMinutes}-minute horizon
+            Snapshot {session.snapshot.snapshotId} ·{" "}
+            {session.snapshot.decisionHorizonMinutes}-minute horizon
           </Text>
         </HStack>
       </VStack>
       <ButtonGroup label="Session actions" size="sm">
-        <Button label="Copy Session ID" variant="secondary" clickAction={onCopySession} />
+        <Button
+          label="Copy Session ID"
+          variant="secondary"
+          clickAction={onCopySession}
+        />
       </ButtonGroup>
     </header>
   );
@@ -441,6 +540,9 @@ function OverviewTab({ session }: { session: RecordedSession }) {
     <Grid columns={{ minWidth: 340, max: 2 }} gap={4}>
       <VStack gap={4}>
         <OutcomeCard session={session} />
+        {session.scenarioInjection.injected && (
+          <ScenarioInjectionCard session={session} />
+        )}
 
         <Card padding={4}>
           <VStack gap={3}>
@@ -449,9 +551,7 @@ function OverviewTab({ session }: { session: RecordedSession }) {
               <Badge
                 label={session.evidenceValidation.validationStatus.toUpperCase()}
                 variant={
-                  session.evidenceValidation.blocked
-                    ? "error"
-                    : "success"
+                  session.evidenceValidation.blocked ? "error" : "success"
                 }
               />
             </HStack>
@@ -459,14 +559,12 @@ function OverviewTab({ session }: { session: RecordedSession }) {
               label="Valid evidence claims"
               value={evidenceProgress(session)}
               hasValueLabel
-              variant={
-                session.evidenceValidation.blocked
-                  ? "error"
-                  : "success"
-              }
+              variant={session.evidenceValidation.blocked ? "error" : "success"}
             />
             <Text>
-              {session.evidenceValidation.validCount} of {session.evidenceValidation.checkedCount} cited claims matched the shared ACME snapshot.
+              {session.evidenceValidation.validCount} of{" "}
+              {session.evidenceValidation.checkedCount} cited claims matched the
+              shared ACME snapshot.
             </Text>
           </VStack>
         </Card>
@@ -474,19 +572,22 @@ function OverviewTab({ session }: { session: RecordedSession }) {
         <Card padding={4}>
           <VStack gap={3}>
             <Heading level={3}>Consensus</Heading>
-            <HStack gap={2} wrap="wrap">
-              <Badge label={session.consensus.status} variant="info" />
-              <Badge label={session.consensus.position ?? "NONE"} variant="blue" />
-              <Badge
-                label={`${matchingVoteCount(session)}/3 votes`}
-                variant="neutral"
-              />
-            </HStack>
-            <Text>
-              {session.consensus.unanimous
-                ? "All agents converged on the same final position."
-                : `${session.consensus.supportingAgentIds.length} agents supported the selected position.`}
-            </Text>
+            {session.consensus ? (
+              <HStack gap={2} wrap="wrap">
+                <Badge label={session.consensus.status} variant="info" />
+                <Badge
+                  label={session.consensus.position ?? "NONE"}
+                  variant="blue"
+                />
+                <Badge
+                  label={`${matchingVoteCount(session)}/3 votes`}
+                  variant="neutral"
+                />
+              </HStack>
+            ) : (
+              <Badge label="NOT RUN" variant="warning" />
+            )}
+            <Text>{consensusExplanation(session)}</Text>
           </VStack>
         </Card>
       </VStack>
@@ -494,35 +595,56 @@ function OverviewTab({ session }: { session: RecordedSession }) {
       <VStack gap={4}>
         <Card padding={4}>
           <VStack gap={3}>
-            <Heading level={3}>Risk Rules</Heading>
-            <Table
-              idKey="ruleId"
-              density="compact"
-              dividers="rows"
-              data={session.riskReview.rules}
-              columns={[
-                {
-                  key: "ruleId",
-                  header: "Rule",
-                  renderCell: (rule) => <Text type="code">{rule.ruleId}</Text>,
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  renderCell: (rule) => (
-                    <Badge
-                      label={rule.outcome}
-                      variant={rule.outcome === "TRIGGERED" ? "error" : "success"}
-                    />
-                  ),
-                },
-                {
-                  key: "message",
-                  header: "Detail",
-                  renderCell: (rule) => <Text type="supporting">{rule.message}</Text>,
-                },
-              ]}
-            />
+            <HStack hAlign="between" vAlign="center">
+              <Heading level={3}>Risk Review</Heading>
+              {!session.riskReview && (
+                <Badge label="NOT RUN" variant="warning" />
+              )}
+            </HStack>
+            {session.riskReview ? (
+              <Table
+                idKey="ruleId"
+                density="compact"
+                dividers="rows"
+                data={session.riskReview.rules}
+                columns={[
+                  {
+                    key: "ruleId",
+                    header: "Rule",
+                    renderCell: (rule) => (
+                      <Text type="code">{rule.ruleId}</Text>
+                    ),
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    renderCell: (rule) => (
+                      <Badge
+                        label={rule.outcome}
+                        variant={
+                          rule.outcome === "TRIGGERED" ? "error" : "success"
+                        }
+                      />
+                    ),
+                  },
+                  {
+                    key: "message",
+                    header: "Detail",
+                    renderCell: (rule) => (
+                      <Text type="supporting">{rule.message}</Text>
+                    ),
+                  },
+                ]}
+              />
+            ) : (
+              <VStack gap={2}>
+                <Badge
+                  label={session.pipelineGate.reasonCode ?? "UPSTREAM_BLOCK"}
+                  variant="error"
+                />
+                <Text>{session.pipelineGate.message}</Text>
+              </VStack>
+            )}
           </VStack>
         </Card>
 
@@ -546,22 +668,112 @@ function OverviewTab({ session }: { session: RecordedSession }) {
 
 function OutcomeCard({ session }: { session: RecordedSession }) {
   const isBlocked = session.execution.status === "BLOCKED";
+  const title =
+    session.outcome === "ERROR"
+      ? "WORKFLOW ERROR RECORDED"
+      : session.outcome === "DEADLOCKED"
+        ? "DEADLOCK - NO CONSENSUS"
+        : session.outcome === "EVIDENCE_BLOCKED"
+          ? "EVIDENCE FAILURE - EXECUTION BLOCKED"
+          : session.outcome === "VETOED"
+            ? "RISK VETO - EXECUTION BLOCKED"
+            : "APPROVED - DECISION READY";
 
   return (
     <Card padding={4} variant={isBlocked ? "red" : "green"}>
       <VStack gap={2}>
         <HStack hAlign="between" vAlign="center" wrap="wrap">
-          <Heading level={3}>
-            {isBlocked
-              ? "VETOED - EXECUTION BLOCKED"
-              : "APPROVED - DECISION READY"}
-          </Heading>
+          <Heading level={3}>{title}</Heading>
           <Badge
-            label={session.execution.status}
-            variant={isBlocked ? "error" : "success"}
+            label={session.outcome}
+            variant={sessionOutcomeVariant(session)}
           />
         </HStack>
         <Text>{session.execution.reason}</Text>
+        {session.error && (
+          <Text type="supporting">
+            {session.error.stage}: {session.error.message} ({session.error.code}
+            )
+          </Text>
+        )}
+      </VStack>
+    </Card>
+  );
+}
+
+function ScenarioInjectionCard({ session }: { session: RecordedSession }) {
+  const injection = session.scenarioInjection;
+
+  return (
+    <Card padding={4}>
+      <VStack gap={3}>
+        <HStack hAlign="between" vAlign="center" wrap="wrap">
+          <Heading level={3}>Controlled Fault Injection</Heading>
+          <Badge label="INJECTED SCENARIO" variant="orange" />
+        </HStack>
+        <Text>{injection.description}</Text>
+
+        {injection.voteOverrides.length > 0 && (
+          <Table
+            idKey={(vote) => vote.agentId}
+            density="compact"
+            dividers="rows"
+            data={injection.voteOverrides}
+            columns={[
+              {
+                key: "agentId",
+                header: "Agent",
+                renderCell: (vote) => (
+                  <Text weight="semibold">
+                    {agentName(session, vote.agentId)}
+                  </Text>
+                ),
+              },
+              {
+                key: "originalPosition",
+                header: "Generated Vote",
+                renderCell: (vote) => (
+                  <Badge label={vote.originalPosition} variant="neutral" />
+                ),
+              },
+              {
+                key: "forcedPosition",
+                header: "Forced Vote",
+                renderCell: (vote) => (
+                  <Badge label={vote.forcedPosition} variant="orange" />
+                ),
+              },
+              {
+                key: "overridden",
+                header: "Changed",
+                renderCell: (vote) => (
+                  <Badge
+                    label={vote.overridden ? "YES" : "NO"}
+                    variant={vote.overridden ? "warning" : "neutral"}
+                  />
+                ),
+              },
+            ]}
+          />
+        )}
+
+        {injection.riskPolicyOverride && (
+          <Text type="supporting">
+            Risk policy override: {injection.riskPolicyOverride.ruleId} changed
+            from {injection.riskPolicyOverride.originalThreshold}% to{" "}
+            {injection.riskPolicyOverride.scenarioThreshold}%.
+          </Text>
+        )}
+
+        {injection.evidenceOverride && (
+          <Text type="supporting">
+            Evidence override:{" "}
+            {agentName(session, injection.evidenceOverride.agentId)} claim{" "}
+            {injection.evidenceOverride.claimIndex + 1} changed from{" "}
+            {injection.evidenceOverride.originalValue} to{" "}
+            {injection.evidenceOverride.forcedValue}.
+          </Text>
+        )}
       </VStack>
     </Card>
   );
@@ -575,18 +787,26 @@ function AgentsTab({ session }: { session: RecordedSession }) {
           <Card key={proposal.agentId} padding={4}>
             <VStack gap={3}>
               <HStack hAlign="between" vAlign="center">
-                <Heading level={3}>{agentName(session, proposal.agentId)}</Heading>
+                <Heading level={3}>
+                  {agentName(session, proposal.agentId)}
+                </Heading>
                 <Badge label={proposal.position} variant="blue" />
               </HStack>
               <Text>{proposal.thesis}</Text>
               <Divider />
               <Grid columns={2} gap={2}>
-                <MiniDatum label="Persona" value={agentPersona(session, proposal.agentId)} />
+                <MiniDatum
+                  label="Persona"
+                  value={agentPersona(session, proposal.agentId)}
+                />
                 <MiniDatum
                   label="Confidence"
                   value={`${Math.round(proposal.confidence * 100)}%`}
                 />
-                <MiniDatum label="Evidence claims" value={`${proposal.evidence.length}`} />
+                <MiniDatum
+                  label="Evidence claims"
+                  value={`${proposal.evidence.length}`}
+                />
                 <MiniDatum
                   label="Validation"
                   value={agentEvidenceStatus(session, proposal.agentId)}
@@ -600,34 +820,63 @@ function AgentsTab({ session }: { session: RecordedSession }) {
       <Card padding={4}>
         <VStack gap={3}>
           <Heading level={3}>Final Votes</Heading>
-          <Table
-            idKey={(vote) => vote.agentId}
-            density="balanced"
-            dividers="rows"
-            data={session.finalVotes}
-            columns={[
-              {
-                key: "agentId",
-                header: "Agent",
-                  renderCell: (vote) => <Text weight="semibold">{agentName(session, vote.agentId)}</Text>,
-              },
-              {
-                key: "position",
-                header: "Vote",
-                renderCell: (vote) => <Badge label={vote.position} variant="blue" />,
-              },
-              {
-                key: "confidence",
-                header: "Confidence",
-                renderCell: (vote) => `${Math.round(vote.confidence * 100)}%`,
-              },
-              {
-                key: "rationale",
-                header: "Rationale",
-                renderCell: (vote) => <Text type="supporting">{vote.rationale}</Text>,
-              },
-            ]}
-          />
+          {session.finalVotes.length > 0 ? (
+            <Table
+              idKey={(vote) => vote.agentId}
+              density="balanced"
+              dividers="rows"
+              data={session.finalVotes}
+              columns={[
+                {
+                  key: "agentId",
+                  header: "Agent",
+                  renderCell: (vote) => (
+                    <Text weight="semibold">
+                      {agentName(session, vote.agentId)}
+                    </Text>
+                  ),
+                },
+                {
+                  key: "position",
+                  header: "Generated → Recorded",
+                  renderCell: (vote) => {
+                    const generated = generatedVotePosition(
+                      session,
+                      vote.agentId,
+                      vote.position,
+                    );
+                    return (
+                      <HStack gap={1} vAlign="center">
+                        <Badge label={generated} variant="neutral" />
+                        <Text type="supporting">→</Text>
+                        <Badge label={vote.position} variant="blue" />
+                      </HStack>
+                    );
+                  },
+                },
+                {
+                  key: "confidence",
+                  header: "Confidence",
+                  renderCell: (vote) => `${Math.round(vote.confidence * 100)}%`,
+                },
+                {
+                  key: "rationale",
+                  header: "Rationale",
+                  renderCell: (vote) => (
+                    <Text type="supporting">{vote.rationale}</Text>
+                  ),
+                },
+              ]}
+            />
+          ) : (
+            <VStack gap={2}>
+              <Badge label="NOT RUN" variant="warning" />
+              <Text>
+                Final voting was skipped because the evidence-integrity gate
+                stopped the pipeline.
+              </Text>
+            </VStack>
+          )}
         </VStack>
       </Card>
     </VStack>
@@ -657,14 +906,14 @@ function ReplayTab({
             <Heading level={3}>Replay Incident</Heading>
             <Badge
               label={`Step ${replayIndex + 1}/${session.replay.length}`}
-              variant={session.mode === "fault" ? "red" : "green"}
+              variant={session.scenario === "healthy" ? "green" : "red"}
             />
           </HStack>
           <ProgressBar
             label="Replay progress"
             value={replayPercent}
             hasValueLabel
-            variant={session.mode === "fault" ? "warning" : "success"}
+            variant={session.scenario === "healthy" ? "success" : "warning"}
           />
           <VStack gap={1}>
             <Heading level={4}>{step?.title}</Heading>
@@ -675,7 +924,9 @@ function ReplayTab({
               label="Previous"
               variant="secondary"
               isDisabled={replayIndex === 0}
-              clickAction={() => setReplayIndex((current) => Math.max(current - 1, 0))}
+              clickAction={() =>
+                setReplayIndex((current) => Math.max(current - 1, 0))
+              }
             />
             <Button
               label="Next Step"
@@ -720,7 +971,7 @@ function ReplayTab({
 }
 
 function AuditTab({ session }: { session: RecordedSession }) {
-  const auditorAnswer = `${session.snapshot.symbol} reached ${session.consensus.status} ${session.consensus.position ?? "without a position"}. ${session.evidenceValidation.validCount}/${session.evidenceValidation.checkedCount} evidence claims passed validation and risk review was ${session.riskReview.status}. No real trade was placed.`;
+  const auditorAnswer = buildAuditorAnswer(session);
 
   return (
     <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
@@ -738,7 +989,25 @@ function AuditTab({ session }: { session: RecordedSession }) {
             label="Validated evidence"
             value={`${session.evidenceValidation.validCount}/${session.evidenceValidation.checkedCount}`}
           />
-          <MiniDatum label="Risk verdict" value={session.riskReview.status} />
+          <MiniDatum
+            label="Risk verdict"
+            value={session.riskReview?.status ?? "NOT RUN"}
+          />
+          <MiniDatum
+            label="Pipeline gate"
+            value={
+              session.pipelineGate.reasonCode
+                ? `${session.pipelineGate.status}: ${session.pipelineGate.reasonCode}`
+                : session.pipelineGate.status
+            }
+          />
+          <MiniDatum label="Session outcome" value={session.outcome} />
+          {session.error && (
+            <MiniDatum
+              label="Recorded error"
+              value={`${session.error.stage}: ${session.error.message}`}
+            />
+          )}
         </VStack>
       </Card>
 
@@ -746,7 +1015,8 @@ function AuditTab({ session }: { session: RecordedSession }) {
         <VStack gap={3}>
           <Heading level={3}>Investigate In SigNoz</Heading>
           <Text type="supporting">
-            SigNoz is the observability backend for the supporting trace, correlated logs, aggregate metrics, dashboards, and alerts.
+            SigNoz is the observability backend for the supporting trace,
+            correlated logs, aggregate metrics, dashboards, and alerts.
           </Text>
           <MiniDatum label="Trace ID" value={session.signoz.traceId} />
           <MiniDatum label="Related logs" value={session.signoz.logsHint} />
@@ -821,7 +1091,99 @@ function evidenceProgress(session: RecordedSession): number {
 }
 
 function matchingVoteCount(session: RecordedSession): number {
+  if (!session.consensus) {
+    return 0;
+  }
+
   return Math.max(...Object.values(session.consensus.voteCounts));
+}
+
+function consensusExplanation(session: RecordedSession): string {
+  if (!session.consensus) {
+    return "Consensus was not run because the evidence-integrity gate stopped the pipeline before cross-examination and final voting.";
+  }
+
+  if (session.scenarioInjection.votesOverridden) {
+    if (session.scenario === "risk-veto") {
+      return "Consensus was calculated from the injected LONG positions for deterministic risk testing. The agents did not organically converge; their generated votes are preserved in the mapping above.";
+    }
+
+    if (session.scenario === "deadlock") {
+      return "The deadlock was calculated from the injected LONG/SHORT/NO_TRADE split. The agents' generated votes are preserved in the mapping above.";
+    }
+
+    return "Consensus was calculated from controlled scenario positions rather than organic agent convergence.";
+  }
+
+  if (session.consensus.unanimous) {
+    return session.scenarioInjection.injected
+      ? "All generated final votes already matched; this scenario did not change their positions."
+      : "All agents organically converged on the same final position.";
+  }
+
+  if (session.consensus.status === "DEADLOCKED") {
+    return "The generated final votes produced no majority position.";
+  }
+
+  return `${session.consensus.supportingAgentIds.length} agents organically supported the selected position.`;
+}
+
+function scenarioSuccessMessage(session: RecordedSession): string {
+  switch (session.scenario) {
+    case "healthy":
+      return "Healthy ACME debate completed and traced.";
+    case "evidence-fault":
+      return "Evidence fault detected, blocked, and traced.";
+    case "risk-veto":
+      return "Directional consensus was vetoed by risk policy and traced.";
+    case "error":
+      return "Controlled workflow error was recorded and traced.";
+    case "deadlock":
+      return "Controlled consensus deadlock was recorded and traced.";
+  }
+}
+
+function scenarioBadgeVariant(
+  scenario: SessionScenario,
+): "green" | "red" | "orange" | "blue" {
+  switch (scenario) {
+    case "healthy":
+      return "green";
+    case "deadlock":
+      return "orange";
+    case "risk-veto":
+      return "blue";
+    case "evidence-fault":
+    case "error":
+      return "red";
+  }
+}
+
+function sessionOutcomeVariant(
+  session: RecordedSession,
+): "success" | "warning" | "error" {
+  if (session.outcome === "APPROVED") {
+    return "success";
+  }
+
+  if (session.outcome === "DEADLOCKED") {
+    return "warning";
+  }
+
+  return "error";
+}
+
+function buildAuditorAnswer(session: RecordedSession): string {
+  if (session.pipelineGate.status === "BLOCKED") {
+    return `${session.snapshot.symbol} was blocked at ${session.pipelineGate.blockedAt} by ${session.pipelineGate.reasonCode}. ${session.evidenceValidation.validCount}/${session.evidenceValidation.checkedCount} evidence claims passed validation. Cross-examination, final voting, consensus, risk review, evaluation, and execution were not run.`;
+  }
+
+  const base = `${session.snapshot.symbol} reached ${session.consensus?.status ?? "no consensus"} ${session.consensus?.position ?? "without a position"}. ${session.evidenceValidation.validCount}/${session.evidenceValidation.checkedCount} evidence claims passed validation and risk review was ${session.riskReview?.status ?? "not run"}.`;
+  const error = session.error
+    ? ` A controlled ${session.error.code} was recorded at ${session.error.stage}.`
+    : "";
+
+  return `${base}${error} No real trade was placed.`;
 }
 
 function agentName(session: RecordedSession, agentId: string): string {
@@ -848,6 +1210,18 @@ function agentEvidenceStatus(
   ).toUpperCase();
 }
 
+function generatedVotePosition(
+  session: RecordedSession,
+  agentId: string,
+  fallback: string,
+): string {
+  return (
+    session.scenarioInjection.voteOverrides.find(
+      (vote) => vote.agentId === agentId,
+    )?.originalPosition ?? fallback
+  );
+}
+
 function shortId(sessionId: string): string {
   return sessionId.slice(0, 8);
 }
@@ -871,9 +1245,9 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as
-      | { error?: string }
-      | null;
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
     throw new Error(
       payload?.error ?? `TraceRoom API request failed (${response.status}).`,
     );

@@ -42,10 +42,10 @@ Configure the LLM variables in `.env`, start SigNoz/Foundry, then run:
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173` and click **Run Healthy Session**. The frontend
-calls the Node API, which feeds `snapshot-001` for `ACME` into the real agent
-pipeline. A successful run persists the stage outputs and emits a fresh
-27-span `debate.session` trace.
+Open `http://127.0.0.1:5173` and select one of the five replay runs. The
+frontend calls the Node API, which feeds `snapshot-001` for `ACME` into the
+real agent pipeline. Every run persists the real agent-stage outputs and emits
+a fresh `debate.session` trace.
 
 The API and frontend can also be started separately:
 
@@ -58,13 +58,24 @@ The Vite server proxies `/api` to `http://127.0.0.1:8787`. Set
 `VITE_API_BASE_URL` when the API is hosted elsewhere. Run a single ACME session
 without the UI with `npm run run:once`.
 
-## Current Scenario Status
+## Replay Scenarios
 
-- Healthy ACME agent run: wired and verified
-- Evidence-fault run: pending completion
-- Risk-veto run: pending completion
-- Error run: pending completion
-- Deadlock run: pending completion
+| Run            | Controlled condition                                                                             | Expected outcome                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Healthy        | No injected condition                                                                            | Risk policy evaluates the agents' real majority decision         |
+| Evidence fault | One generated evidence value is shifted by 8%                                                    | `EVIDENCE_INTEGRITY` stops the pipeline before cross-examination |
+| Risk veto      | Final positions are transparently normalized to `LONG` and the replay uses a 4% price-move limit | `MAX_PRICE_MOVE` veto                                            |
+| Error          | Post-stage decision recording raises a controlled failure                                        | Persisted `ERROR` session and error spans                        |
+| Deadlock       | Final positions are transparently normalized to `LONG`, `SHORT`, and `NO_TRADE`                  | `CONSENSUS_REQUIRED` deadlock                                    |
+
+All five runs start with the real proposal LLM stage. The healthy, risk-veto,
+error, and deadlock runs continue through the real rebuttal and final-vote LLM
+stages. The evidence-fault run intentionally stops after proposal evidence
+fails validation, so it does not spend calls on rebuttals or final votes.
+Controlled changes are identified in telemetry and the readable replay.
+Vote-injected runs show an **Injected Scenario** badge and preserve a
+generated-to-forced mapping for every controlled final vote.
+
 - Live and paper trading: deprioritized
 
 ## SigNoz

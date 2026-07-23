@@ -21,8 +21,9 @@ export type ControlledEvidenceScenario =
 
 export function applyControlledEvidenceFault(
   proposals: readonly AgentProposal[],
+  scenario = process.env.TRACEROOM_SCENARIO,
 ): ControlledEvidenceScenario {
-  if (process.env.TRACEROOM_SCENARIO !== FAILURE_SCENARIO) {
+  if (scenario !== FAILURE_SCENARIO) {
     return {
       scenario: "normal",
       faultInjected: false,
@@ -30,21 +31,26 @@ export function applyControlledEvidenceFault(
     };
   }
 
-  const proposalIndex = proposals.findIndex((proposal) =>
+  const currentPriceProposalIndex = proposals.findIndex((proposal) =>
     proposal.evidence.some((claim) => claim.claimType === "CURRENT_PRICE"),
   );
+  const proposalIndex =
+    currentPriceProposalIndex >= 0
+      ? currentPriceProposalIndex
+      : proposals.findIndex((proposal) => proposal.evidence.length > 0);
 
   const targetProposal = proposals[proposalIndex];
 
   if (!targetProposal) {
     throw new Error(
-      "Controlled fault injection failed: no CURRENT_PRICE claim found",
+      "Controlled fault injection failed: no evidence claim found",
     );
   }
 
-  const claimIndex = targetProposal.evidence.findIndex(
+  const currentPriceClaimIndex = targetProposal.evidence.findIndex(
     (claim) => claim.claimType === "CURRENT_PRICE",
   );
+  const claimIndex = currentPriceClaimIndex >= 0 ? currentPriceClaimIndex : 0;
 
   const targetClaim = targetProposal.evidence[claimIndex];
 

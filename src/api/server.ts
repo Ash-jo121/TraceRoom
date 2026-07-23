@@ -1,7 +1,11 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { SessionStore } from "../persistence/sessionStore";
+import { resolveSessionScenario } from "../scenarios/runScenario";
 import { runDebateSession } from "../session/runDebateSession";
-import type { SessionMode } from "../session/types";
 import { telemetrySdk } from "../telemetry/tracing";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -47,7 +51,10 @@ async function route(
     return;
   }
 
-  const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host}`);
+  const requestUrl = new URL(
+    request.url ?? "/",
+    `http://${request.headers.host}`,
+  );
   const pathname = requestUrl.pathname;
 
   if (request.method === "GET" && pathname === "/health") {
@@ -60,11 +67,14 @@ async function route(
   }
 
   if (request.method === "POST" && pathname === "/sessions/run") {
-    const mode = parseMode(requestUrl.searchParams.get("mode"));
-    const session = await runDebateSession(mode);
+    const scenario = resolveSessionScenario(
+      requestUrl.searchParams.get("scenario") ??
+        requestUrl.searchParams.get("mode"),
+    );
+    const session = await runDebateSession(scenario);
     store.save(session);
     console.log(
-      `Session completed: mode=${session.mode} sessionId=${session.sessionId} traceId=${session.signoz.traceId} outcome=${session.outcome}`,
+      `Session completed: scenario=${session.scenario} sessionId=${session.sessionId} traceId=${session.signoz.traceId} outcome=${session.outcome}`,
     );
     sendJson(response, 201, session);
     return;
@@ -87,13 +97,6 @@ async function route(
   }
 
   sendJson(response, 404, { error: "Not found" });
-}
-
-function parseMode(value: string | null): SessionMode {
-  if (value === "healthy" || value === "fault") {
-    return value;
-  }
-  return "healthy";
 }
 
 function applyCors(response: ServerResponse): void {

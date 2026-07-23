@@ -14,3 +14,12 @@ export function logInfo(body: string, attributes: LogAttributes = {}): void {
     attributes,
   });
 }
+
+export function logError(body: string, attributes: LogAttributes = {}): void {
+  telemetryLogger.emit({
+    severityNumber: SeverityNumber.ERROR,
+    severityText: "ERROR",
+    body,
+    attributes,
+  });
+}

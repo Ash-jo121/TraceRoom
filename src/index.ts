@@ -1,10 +1,11 @@
 import { runDebateSession } from "./session/runDebateSession";
+import { resolveSessionScenario } from "./scenarios/runScenario";
 import { telemetrySdk } from "./telemetry/tracing";
 
 console.log("TraceRoom ACME debate session starting...");
 
 try {
-  const session = await runDebateSession("healthy");
+  const session = await runDebateSession(resolveSessionScenario());
   console.log(JSON.stringify(session, null, 2));
 } catch (error) {
   console.error("Error running debate session:");

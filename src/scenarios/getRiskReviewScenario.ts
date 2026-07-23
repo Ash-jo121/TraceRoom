@@ -11,8 +11,10 @@ export interface RiskReviewScenario {
   scenarioThreshold?: number;
 }
 
-export function getRiskReviewScenario(): RiskReviewScenario {
-  if (process.env.TRACEROOM_SCENARIO !== RISK_VETO_SCENARIO) {
+export function getRiskReviewScenario(
+  scenario = process.env.TRACEROOM_SCENARIO,
+): RiskReviewScenario {
+  if (scenario !== RISK_VETO_SCENARIO) {
     return {
       scenario: "normal",
       policyOverridden: false,
