@@ -36,20 +36,33 @@ npm install
 npm --prefix frontend install
 ```
 
+Use Node.js 22.13 or newer. TraceRoom uses the built-in `node:sqlite` module,
+which is not available in Node.js 20.
+
 Configure the LLM variables in `.env`, start SigNoz/Foundry, then run:
 
 ```bash
 npm run dev
 ```
 
-The root development command waits for the API health check before starting
-Vite, preventing the frontend's initial session request from racing API
-startup.
+Open `http://127.0.0.1:5173`. The command page launches the canonical INFY
+evidence breach, then moves into a live agent room while the pipeline runs.
+The incident lab exposes all five deterministic scenarios, and the evidence
+page combines natural-language SigNoz MCP investigation with a downloadable
+SHA-256 proof receipt. Every run persists the real agent-stage outputs and
+emits a fresh `debate.session` trace.
 
-Open `http://127.0.0.1:5173` and select one of the five replay runs. The
-frontend calls the Node API, which feeds `snapshot-001` for `ACME` into the
-real agent pipeline. Every run persists the real agent-stage outputs and emits
-a fresh `debate.session` trace.
+The interface is split into five purpose-built spaces:
+
+- **Command** tells the product story and launches the breach.
+- **Agent room** renders the active reasoning network on an interactive canvas,
+  then replays recorded agent transmissions.
+- **Snapshot forge** validates a new NSE or US equity snapshot, shows field-level
+  provenance, locks the evidence, and releases a healthy agent session.
+- **Incidents** compares healthy, evidence-fault, risk-veto, error, and deadlock
+  sessions without collapsing them into a generic dashboard.
+- **Evidence** reconstructs a selected decision through SigNoz MCP and exports
+  an integrity-stamped receipt.
 
 The API and frontend can also be started separately:
 
@@ -59,7 +72,7 @@ npm --prefix frontend run dev
 ```
 
 The Vite server proxies `/api` to `http://127.0.0.1:8787`. Set
-`VITE_API_BASE_URL` when the API is hosted elsewhere. Run a single ACME session
+`VITE_API_BASE_URL` when the API is hosted elsewhere. Run a single INFY session
 without the UI with `npm run run:once`.
 
 ## Replay Scenarios
@@ -93,10 +106,38 @@ for structural telemetry inspection.
 
 - Live and paper trading: deprioritized
 
+## Snapshot Forge
+
+Snapshot Forge is an optional showcase path. The canonical INFY fixture remains
+the guaranteed demo.
+
+Set `TWELVE_DATA_API_KEY` to validate symbols and retrieve quote plus daily
+OHLCV history. TraceRoom calculates SMA20, EMA9, RSI14, and average volume
+locally. Set the separate `OPENAI_API_KEY` to attach web-searched company
+context, catalysts, risks, and citations. OpenAI output is never merged into
+numeric market fields.
+
+The flow is deliberately gated:
+
+1. `POST /market/snapshots` creates a candidate.
+2. A candidate can be `READY`, `STALE`, `BLOCKED`, or `FIXTURE_FALLBACK`.
+3. `POST /market/snapshots/:id/lock` creates an immutable `LOCKED` candidate.
+4. `POST /sessions/run` accepts `{ "scenario": "healthy", "snapshotId": "..." }`.
+
+Only locked candidates can run. If Twelve Data fails, INFY on NSE may use the
+clearly labeled fixture; any other symbol stays blocked. If OpenAI web search
+fails, trusted market numbers can still pass validation without context.
+
 ## SigNoz
 
 The API exports OTLP/HTTP telemetry to `http://127.0.0.1:4318` by default.
 See `docs/SIGNOZ_SETUP.md` and `docs/TELEMETRY_MAP.md`.
+
+The Evidence page also provides **Ask the Auditor**, a natural-language search
+surface backed by the SigNoz MCP server at `SIGNOZ_MCP_URL` (default
+`http://localhost:8000/mcp`). Searches are scoped to the selected session and
+use read-only trace, log, metric, alert, or dashboard tools. When MCP is
+offline, the result is clearly labeled as a deterministic session fallback.
 
 ## AI Disclosure
 

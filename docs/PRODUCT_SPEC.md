@@ -20,9 +20,9 @@ TraceRoom audits.
 ## Current Replay Fixture
 
 - Snapshot: `snapshot-001`
-- Symbol: `ACME`
-- Current price: `104.50`
-- Previous close: `99.50`
+- Symbol: `INFY`
+- Current price: `1684.50`
+- Previous close: `1600.00`
 - Horizon: `30` minutes
 - Agents: Momentum Scout, Mean Reversion Analyst, Market Skeptic
 
@@ -39,7 +39,7 @@ The UI and API expose five real-agent replay paths:
 - controlled post-stage workflow error
 - controlled consensus deadlock
 
-All paths send the ACME snapshot through the configured proposal LLM calls.
+All paths send the INFY snapshot through the configured proposal LLM calls.
 Healthy, risk-veto, error, and deadlock continue through rebuttal and final
 voting. Evidence-fault terminates immediately after deterministic validation
 fails, leaving those downstream stages explicitly not run. Scenario controls

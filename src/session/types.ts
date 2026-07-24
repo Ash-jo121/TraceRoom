@@ -96,6 +96,7 @@ export interface RecordedSession {
   evidenceValidation: EvidenceValidationReport;
   riskReview: RiskReviewResult | null;
   evaluation: DecisionEvaluationReport | null;
+  evaluationNote?: string | null;
   execution: {
     executionAllowed: boolean;
     status: "READY" | "BLOCKED";

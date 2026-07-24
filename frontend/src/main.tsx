@@ -1,17 +1,18 @@
+import "@fontsource-variable/manrope";
+import "@fontsource-variable/jetbrains-mono";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { Theme } from "@astryxdesign/core/theme";
-import { ToastViewport } from "@astryxdesign/core/Toast";
-import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
+import { TraceRoomProvider } from "./TraceRoomContext";
 import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Theme theme={neutralTheme}>
-      <ToastViewport position="bottomEnd" maxVisible={3}>
+    <BrowserRouter>
+      <TraceRoomProvider>
         <App />
-      </ToastViewport>
-    </Theme>
+      </TraceRoomProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 );

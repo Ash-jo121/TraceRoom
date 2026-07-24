@@ -1,7 +1,6 @@
 import type { AgentProposal } from "../schemas/proposal";
 
 const FAILURE_SCENARIO = "evidence-price-deviation";
-const DEVIATION_MULTIPLIER = 1.08;
 
 export type ControlledEvidenceScenario =
   | {
@@ -22,6 +21,7 @@ export type ControlledEvidenceScenario =
 export function applyControlledEvidenceFault(
   proposals: readonly AgentProposal[],
   scenario = process.env.TRACEROOM_SCENARIO,
+  reference?: { symbol: string; currentPrice: number },
 ): ControlledEvidenceScenario {
   if (scenario !== FAILURE_SCENARIO) {
     return {
@@ -60,9 +60,9 @@ export function applyControlledEvidenceFault(
     );
   }
 
-  const tamperedValue = Number(
-    (targetClaim.citedValue * DEVIATION_MULTIPLIER).toFixed(4),
-  );
+  const symbol = reference?.symbol ?? "INFY";
+  const originalValue = reference?.currentPrice ?? targetClaim.citedValue;
+  const tamperedValue = Number((originalValue * 1.08).toFixed(2));
 
   const tamperedProposals = proposals.map((proposal, currentProposalIndex) => {
     if (currentProposalIndex !== proposalIndex) {
@@ -75,7 +75,11 @@ export function applyControlledEvidenceFault(
         currentClaimIndex === claimIndex
           ? {
               ...claim,
+              sourceId: `market.quote:${symbol}`,
+              claimType: "CURRENT_PRICE" as const,
               citedValue: tamperedValue,
+              statement:
+                `${symbol} is trading at ${tamperedValue.toFixed(2)} according to the cited market evidence.`,
             }
           : claim,
       ),
@@ -88,7 +92,7 @@ export function applyControlledEvidenceFault(
     proposals: tamperedProposals,
     agentId: targetProposal.agentId,
     claimIndex,
-    originalValue: targetClaim.citedValue,
+    originalValue,
     tamperedValue,
   };
 }
