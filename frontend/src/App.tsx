@@ -14,6 +14,7 @@ import { Text, Heading } from "@astryxdesign/core/Text";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { useToast } from "@astryxdesign/core/Toast";
 import { useEffect, useMemo, useState } from "react";
+import { DebateTab } from "./DebateTab";
 
 type SessionScenario =
   | "healthy"
@@ -22,7 +23,7 @@ type SessionScenario =
   | "error"
   | "deadlock";
 type SessionStageStatus = "COMPLETED" | "BLOCKED" | "SKIPPED" | "ERROR";
-type ActiveTab = "overview" | "agents" | "replay" | "audit";
+type ActiveTab = "overview" | "debate" | "agents" | "replay" | "audit";
 
 interface RecordedSession {
   schemaVersion: 4;
@@ -112,7 +113,16 @@ interface RecordedSession {
     }>;
     risks: string[];
   }>;
-  rebuttals: unknown[];
+  rebuttals: Array<{
+    agentId: string;
+    critiques: Array<{
+      targetAgentId: string;
+      strongestAgreement: string;
+      strongestObjection: string;
+      evidenceConflicts: string[];
+    }>;
+    overallAssessment: string;
+  }>;
   finalVotes: Array<{
     agentId: string;
     position: string;
@@ -143,6 +153,15 @@ interface RecordedSession {
       checkedCount: number;
       validCount: number;
       invalidCount: number;
+      checkedEvidence: Array<{
+        sourceId: string;
+        claimType: string;
+        statement: string;
+        citedValue: number;
+        referenceValue: number;
+        deviationPct: number;
+        validationStatus: string;
+      }>;
     }>;
   };
   riskReview: {
@@ -446,6 +465,7 @@ export function App() {
               hasDivider
             >
               <Tab value="overview" label="Overview" />
+              <Tab value="debate" label="Debate" />
               <Tab value="agents" label="Agents" />
               <Tab value="replay" label="Replay" />
               <Tab value="audit" label="Audit" />
@@ -454,6 +474,7 @@ export function App() {
             {activeTab === "overview" && (
               <OverviewTab session={selectedSession} />
             )}
+            {activeTab === "debate" && <DebateTab session={selectedSession} />}
             {activeTab === "agents" && <AgentsTab session={selectedSession} />}
             {activeTab === "replay" && (
               <ReplayTab
@@ -780,6 +801,8 @@ function ScenarioInjectionCard({ session }: { session: RecordedSession }) {
 }
 
 function AgentsTab({ session }: { session: RecordedSession }) {
+  const hasScenarioVoteOverrides = sessionHasVoteOverrides(session);
+
   return (
     <VStack gap={4}>
       <Grid columns={{ minWidth: 280, max: 3 }} gap={4}>
@@ -838,16 +861,21 @@ function AgentsTab({ session }: { session: RecordedSession }) {
                 },
                 {
                   key: "position",
-                  header: "Generated → Recorded",
+                  header: hasScenarioVoteOverrides
+                    ? "Generated → Recorded"
+                    : "Initial → Final",
                   renderCell: (vote) => {
                     const generated = generatedVotePosition(
                       session,
                       vote.agentId,
                       vote.position,
                     );
+                    const transitionStart = hasScenarioVoteOverrides
+                      ? generated
+                      : vote.initialPosition;
                     return (
                       <HStack gap={1} vAlign="center">
-                        <Badge label={generated} variant="neutral" />
+                        <Badge label={transitionStart} variant="neutral" />
                         <Text type="supporting">→</Text>
                         <Badge label={vote.position} variant="blue" />
                       </HStack>
@@ -1219,6 +1247,12 @@ function generatedVotePosition(
     session.scenarioInjection.voteOverrides.find(
       (vote) => vote.agentId === agentId,
     )?.originalPosition ?? fallback
+  );
+}
+
+function sessionHasVoteOverrides(session: RecordedSession): boolean {
+  return session.scenarioInjection.voteOverrides.some(
+    (vote) => vote.overridden,
   );
 }
 

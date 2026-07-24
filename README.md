@@ -42,6 +42,10 @@ Configure the LLM variables in `.env`, start SigNoz/Foundry, then run:
 npm run dev
 ```
 
+The root development command waits for the API health check before starting
+Vite, preventing the frontend's initial session request from racing API
+startup.
+
 Open `http://127.0.0.1:5173` and select one of the five replay runs. The
 frontend calls the Node API, which feeds `snapshot-001` for `ACME` into the
 real agent pipeline. Every run persists the real agent-stage outputs and emits
@@ -75,6 +79,17 @@ fails validation, so it does not spend calls on rebuttals or final votes.
 Controlled changes are identified in telemetry and the readable replay.
 Vote-injected runs show an **Injected Scenario** badge and preserve a
 generated-to-forced mapping for every controlled final vote.
+
+## Human-Readable Debate Record
+
+The decision detail includes a **Debate** tab that renders the persisted session
+as one chronological transcript: authoritative snapshot, independent
+proposals, validated evidence, cross-examination, final votes, consensus, and
+the deterministic risk verdict. Controlled evidence, vote, policy, and error
+injections are disclosed inline at the point where they affect the replay.
+Skipped stages remain visible, so an evidence-blocked session shows exactly
+where the pipeline stopped. The transcript links to the matching SigNoz trace
+for structural telemetry inspection.
 
 - Live and paper trading: deprioritized
 
