@@ -3,6 +3,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import { answerTelemetryQuestion } from "../integrations/signozMcpAuditor";
 import { SessionStore } from "../persistence/sessionStore";
 import { resolveSessionScenario } from "../scenarios/runScenario";
 import { runDebateSession } from "../session/runDebateSession";
@@ -96,7 +97,66 @@ async function route(
     return;
   }
 
+  const auditorSearchMatch = pathname.match(
+    /^\/sessions\/([^/]+)\/auditor\/search$/,
+  );
+  if (request.method === "POST" && auditorSearchMatch) {
+    const session = store.get(decodeURIComponent(auditorSearchMatch[1]));
+    if (!session) {
+      sendJson(response, 404, { error: "Session not found" });
+      return;
+    }
+
+    const body = await readJsonBody(request);
+    const question =
+      body &&
+      typeof body === "object" &&
+      "question" in body &&
+      typeof body.question === "string"
+        ? body.question.trim()
+        : "";
+    if (question.length === 0) {
+      sendJson(response, 400, { error: "A question is required." });
+      return;
+    }
+    if (question.length > 500) {
+      sendJson(response, 400, {
+        error: "Question must be 500 characters or fewer.",
+      });
+      return;
+    }
+
+    sendJson(
+      response,
+      200,
+      await answerTelemetryQuestion(session, question),
+    );
+    return;
+  }
+
   sendJson(response, 404, { error: "Not found" });
+}
+
+async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > 16_384) {
+      throw new Error("Request body is too large.");
+    }
+    chunks.push(buffer);
+  }
+
+  if (chunks.length === 0) {
+    return null;
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+  } catch {
+    throw new Error("Request body must be valid JSON.");
+  }
 }
 
 function applyCors(response: ServerResponse): void {

@@ -108,7 +108,7 @@ investigation, aggregate dashboards, metrics, logs, and alerts.
 The current healthy replay uses:
 
 - snapshot: `snapshot-001`
-- symbol: `ACME`
+- symbol: `INFY`
 - horizon: 30 minutes
 - agents: Momentum Scout, Mean Reversion Analyst, and Market Skeptic
 
@@ -120,7 +120,7 @@ those outputs are not prewritten UI fixtures.
 
 1. The user clicks **Run Healthy Session**.
 2. TraceRoom creates a correlated session identifier.
-3. The API loads the shared ACME replay snapshot.
+3. The API loads the shared INFY replay snapshot.
 4. All three agents receive the same snapshot.
 5. Each agent makes an LLM call and submits a sealed proposal.
 6. TraceRoom validates every cited value against the shared snapshot.

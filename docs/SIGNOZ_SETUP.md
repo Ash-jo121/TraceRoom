@@ -21,12 +21,34 @@ Expected local endpoints:
 
 When Foundry runs inside WSL, ensure port `4318` is exposed to Windows.
 
-## Verify A UI-Triggered ACME Trace
+The API connects to the MCP HTTP transport with:
+
+```dotenv
+SIGNOZ_MCP_URL=http://localhost:8000/mcp
+SIGNOZ_MCP_TIMEOUT_MS=2500
+```
+
+If the MCP server does not already hold the SigNoz credentials, also set
+`SIGNOZ_API_KEY`. The backend only selects read-only MCP tools. In the UI,
+open a recorded session's **Audit** tab and use **Ask the Auditor**. The
+response badge distinguishes live `SigNoz MCP` evidence from the deterministic
+session fallback used when MCP is unavailable.
+
+The API route is:
+
+```text
+POST /sessions/:sessionId/auditor/search
+Content-Type: application/json
+
+{"question":"Why was execution blocked?"}
+```
+
+## Verify A UI-Triggered INFY Trace
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:5173`.
 3. Click **Run Healthy Session**.
-4. Copy the trace ID printed by the API or shown in the Audit tab.
+4. Copy the trace ID printed by the API or shown on the Evidence page.
 5. Search the `traceroom-debate-simulation` service for that trace ID.
 
 The expected root is `debate.session`. A successful healthy run has 27 spans:

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "concurrently --kill-others --names api,ui --prefix-colors cyan,magenta \"npm run api\" \"npm --prefix frontend run dev\"",
     "run:once": "tsx src/index.ts",

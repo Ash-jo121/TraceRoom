@@ -1,12 +1,12 @@
 # Checkpoint Status
 
-Current target: ACME replay sessions driven by the real three-agent LLM
+Current target: INFY replay sessions driven by the real three-agent LLM
 pipeline and recorded in SigNoz.
 
 ## Completed
 
 - Foundry files exist: `casting.yaml`, `casting.yaml.lock`.
-- ACME `snapshot-001` market fixture feeds the agent pipeline.
+- INFY `snapshot-001` market fixture feeds the agent pipeline.
 - Three proposal, rebuttal, and final-vote stages execute through the configured LLM.
 - Evidence validation, consensus, risk review, and linked evaluation are traced.
 - Node API persists real stage outputs to SQLite.
@@ -14,11 +14,21 @@ pipeline and recorded in SigNoz.
 - Root `npm run dev` starts the API and frontend together.
 - A UI-triggered healthy run produces the expected 27-span `debate.session` trace.
 - Evidence-fault, risk-veto, deadlock, and controlled-error sessions start from
-  the same real ACME agent pipeline and persist their outcomes.
+  the same real INFY agent pipeline and persist their outcomes.
 - The evidence-integrity gate persists a terminal blocked session and skips
   every downstream debate and decision stage.
 - Deterministic tests cover `EVIDENCE_INTEGRITY`, `MAX_PRICE_MOVE`,
   `CONSENSUS_REQUIRED`, and scenario routing.
+- The Evidence page accepts natural-language session questions and searches
+  read-only SigNoz MCP trace, log, metric, alert, and dashboard tools through
+  the API.
+- Ask the Auditor labels live MCP results and preserves a deterministic
+  persisted-session fallback when the local MCP service is unavailable.
+- The cinematic four-page interface separates the command story, live canvas
+  agent room, five-scenario incident lab, and forensic evidence workflow.
+- The live room visualizes active agent transmissions while a session runs,
+  then switches to the persisted replay without inventing execution results.
+- Downloaded block receipts include a SHA-256 checksum over their proof payload.
 
 ## Working Demo Path
 
@@ -26,15 +36,16 @@ pipeline and recorded in SigNoz.
 2. Start Foundry/SigNoz and confirm OTLP port `4318` is exposed.
 3. Run `npm run dev` from the repository root.
 4. Open `http://127.0.0.1:5173`.
-5. Select any replay scenario.
-6. Copy the trace ID from the API output or Audit tab.
-7. Open the `debate.session` trace in SigNoz and inspect its stage hierarchy,
+5. Run the canonical breach from Command, or choose any replay in Incidents.
+6. Watch the agents talk in the live canvas room, then inspect the persisted replay.
+7. Open the Evidence page and ask `Why was execution blocked?`, `Which span
+   failed?`, or `Show the session logs`.
+8. Download the proof receipt or copy the trace ID from the Evidence page.
+9. Open the `debate.session` trace in SigNoz and inspect its stage hierarchy,
    attributes, events, logs, and error status.
 
 ## Pending
 
-- Human-readable Debate tab.
-- SigNoz MCP Auditor integration from the teammate branch.
 - Final dashboards and alerts.
 
 Live market trading and paper trading are intentionally deprioritized.

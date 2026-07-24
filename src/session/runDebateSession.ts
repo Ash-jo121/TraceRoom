@@ -764,8 +764,8 @@ function buildReplay(
     return [
       {
         order: 1,
-        title: "ACME snapshot captured",
-        detail: `Snapshot ${marketSnapshot.snapshotId} captured ACME at ${marketSnapshot.currentPrice}.`,
+        title: `${marketSnapshot.symbol} snapshot captured`,
+        detail: `Snapshot ${marketSnapshot.snapshotId} captured ${marketSnapshot.symbol} at ${marketSnapshot.currentPrice}.`,
       },
       {
         order: 2,
@@ -789,8 +789,8 @@ function buildReplay(
   const steps: ReplayStep[] = [
     {
       order: 1,
-      title: "ACME snapshot captured",
-      detail: `Snapshot ${marketSnapshot.snapshotId} captured ACME at ${marketSnapshot.currentPrice}.`,
+      title: `${marketSnapshot.symbol} snapshot captured`,
+      detail: `Snapshot ${marketSnapshot.snapshotId} captured ${marketSnapshot.symbol} at ${marketSnapshot.currentPrice}.`,
     },
     {
       order: 2,

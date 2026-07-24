@@ -1,7 +1,7 @@
 import type { AgentProposal } from "../schemas/proposal";
 
 const FAILURE_SCENARIO = "evidence-price-deviation";
-const DEVIATION_MULTIPLIER = 1.08;
+const INFY_FAULT_CITED_PRICE = 1819.26;
 
 export type ControlledEvidenceScenario =
   | {
@@ -60,9 +60,7 @@ export function applyControlledEvidenceFault(
     );
   }
 
-  const tamperedValue = Number(
-    (targetClaim.citedValue * DEVIATION_MULTIPLIER).toFixed(4),
-  );
+  const tamperedValue = INFY_FAULT_CITED_PRICE;
 
   const tamperedProposals = proposals.map((proposal, currentProposalIndex) => {
     if (currentProposalIndex !== proposalIndex) {
@@ -75,7 +73,11 @@ export function applyControlledEvidenceFault(
         currentClaimIndex === claimIndex
           ? {
               ...claim,
+              sourceId: "market.quote:INFY",
+              claimType: "CURRENT_PRICE" as const,
               citedValue: tamperedValue,
+              statement:
+                "INFY is trading at 1819.26 according to the cited market evidence.",
             }
           : claim,
       ),
