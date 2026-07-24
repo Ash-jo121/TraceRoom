@@ -45,3 +45,16 @@ voting. Evidence-fault terminates immediately after deterministic validation
 fails, leaving those downstream stages explicitly not run. Scenario controls
 are disclosed in the replay and telemetry and make the incident demonstrations
 repeatable. No live or paper trade is placed.
+
+## Debate Transcript
+
+The decision detail's **Debate** tab is the human-readable companion to the
+SigNoz trace. It renders the persisted stage outputs in chronological order:
+snapshot, proposals, per-claim validation, cross-examination, final votes,
+consensus, and risk verdict. Scenario injections are labeled at the point where
+they enter the workflow, generated and recorded votes remain distinguishable,
+and evidence-gated stages are shown as skipped instead of disappearing.
+
+This transcript does not replace SigNoz. It explains the argument content while
+the linked SigNoz trace, logs, metrics, dashboards, and alerts prove the
+instrumented execution path.

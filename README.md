@@ -93,6 +93,17 @@ Controlled changes are identified in telemetry and the readable replay.
 Vote-injected runs show an **Injected Scenario** badge and preserve a
 generated-to-forced mapping for every controlled final vote.
 
+## Human-Readable Debate Record
+
+The decision detail includes a **Debate** tab that renders the persisted session
+as one chronological transcript: authoritative snapshot, independent
+proposals, validated evidence, cross-examination, final votes, consensus, and
+the deterministic risk verdict. Controlled evidence, vote, policy, and error
+injections are disclosed inline at the point where they affect the replay.
+Skipped stages remain visible, so an evidence-blocked session shows exactly
+where the pipeline stopped. The transcript links to the matching SigNoz trace
+for structural telemetry inspection.
+
 - Live and paper trading: deprioritized
 
 ## Snapshot Forge

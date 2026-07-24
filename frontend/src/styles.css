@@ -2259,4 +2259,13 @@ a {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+
+  .tr-debate-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tr-final-vote-row {
+    grid-template-columns: 1fr;
+  }
 }

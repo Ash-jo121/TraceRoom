@@ -17,6 +17,9 @@ pipeline and recorded in SigNoz.
   the same real INFY agent pipeline and persist their outcomes.
 - The evidence-integrity gate persists a terminal blocked session and skips
   every downstream debate and decision stage.
+- The Debate tab renders the complete saved decision transcript, including
+  validated evidence, cross-examination, vote changes, controlled injections,
+  consensus, risk verdicts, errors, and explicit skipped-stage stubs.
 - Deterministic tests cover `EVIDENCE_INTEGRITY`, `MAX_PRICE_MOVE`,
   `CONSENSUS_REQUIRED`, and scenario routing.
 - The Evidence page accepts natural-language session questions and searches

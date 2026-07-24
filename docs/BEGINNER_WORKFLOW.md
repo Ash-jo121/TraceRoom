@@ -213,9 +213,17 @@ shows the generated and forced vote for every agent. SigNoz retains the real
 LLM result on `agent.final_vote` and records the transformation as
 `scenario.vote_override` events on the parent final-vote round.
 
+## Human-Readable Debate Record
+
+The **Debate** tab turns the saved agent-stage outputs into one chronological
+transcript. It shows the shared snapshot, each proposal and its evidence,
+cross-examination, final votes, consensus, and the risk verdict. Controlled
+injections appear inline, while stages stopped by the evidence gate remain
+visible as **Skipped**. The header links the readable record to its SigNoz
+trace.
+
 ## Upcoming Product Work
 
-- human-readable Debate tab
 - SigNoz MCP-backed Ask the Auditor
 
 Live-market and paper-trading modes are deprioritized. They are potential data
