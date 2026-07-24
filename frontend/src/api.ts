@@ -1,6 +1,8 @@
 import type {
   RecordedSession,
   SessionScenario,
+  SnapshotCandidate,
+  SnapshotExchange,
   TelemetryQuestionAnswer,
 } from "./types";
 
@@ -12,9 +14,31 @@ export async function loadSessions(): Promise<RecordedSession[]> {
 
 export async function runSession(
   scenario: SessionScenario,
+  snapshotId?: string,
 ): Promise<RecordedSession> {
-  return requestJson<RecordedSession>(
-    `${apiBaseUrl}/sessions/run?scenario=${scenario}`,
+  return requestJson<RecordedSession>(`${apiBaseUrl}/sessions/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenario, snapshotId }),
+  });
+}
+
+export async function createSnapshot(
+  symbol: string,
+  exchange: SnapshotExchange,
+): Promise<SnapshotCandidate> {
+  return requestJson<SnapshotCandidate>(`${apiBaseUrl}/market/snapshots`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol, exchange }),
+  });
+}
+
+export async function lockSnapshot(
+  candidateId: string,
+): Promise<SnapshotCandidate> {
+  return requestJson<SnapshotCandidate>(
+    `${apiBaseUrl}/market/snapshots/${encodeURIComponent(candidateId)}/lock`,
     { method: "POST" },
   );
 }
@@ -49,4 +73,3 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   }
   return (await response.json()) as T;
 }
-

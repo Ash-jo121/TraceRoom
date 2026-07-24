@@ -3,6 +3,7 @@ import {
   Binary,
   Circuitry,
   Command,
+  Flask,
   List,
   Pulse,
   ShieldCheck,
@@ -16,6 +17,7 @@ import { useTraceRoom } from "../TraceRoomContext";
 const navItems = [
   { to: "/", label: "Command", icon: Command },
   { to: "/room", label: "Agent room", icon: Circuitry },
+  { to: "/forge", label: "Snapshot forge", icon: Flask },
   { to: "/incidents", label: "Incidents", icon: Archive },
   { to: "/evidence", label: "Evidence", icon: ShieldCheck },
 ];

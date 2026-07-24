@@ -17,10 +17,15 @@ interface TraceRoomState {
   sessions: RecordedSession[];
   selected: RecordedSession | null;
   loadingScenario: SessionScenario | null;
+  activeRunSymbol: string | null;
   booting: boolean;
   error: string | null;
   selectSession: (sessionId: string) => void;
-  runScenario: (scenario: SessionScenario) => Promise<RecordedSession | null>;
+  runScenario: (
+    scenario: SessionScenario,
+    snapshotId?: string,
+    symbol?: string,
+  ) => Promise<RecordedSession | null>;
   refresh: () => Promise<void>;
 }
 
@@ -31,6 +36,7 @@ export function TraceRoomProvider({ children }: { children: ReactNode }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadingScenario, setLoadingScenario] =
     useState<SessionScenario | null>(null);
+  const [activeRunSymbol, setActiveRunSymbol] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,11 +57,16 @@ export function TraceRoomProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const runScenario = useCallback(async (scenario: SessionScenario) => {
+  const runScenario = useCallback(async (
+    scenario: SessionScenario,
+    snapshotId?: string,
+    symbol?: string,
+  ) => {
     setLoadingScenario(scenario);
+    setActiveRunSymbol(symbol ?? "INFY");
     setError(null);
     try {
-      const session = await requestRunSession(scenario);
+      const session = await requestRunSession(scenario, snapshotId);
       setSessions((current) => [
         session,
         ...current.filter((item) => item.sessionId !== session.sessionId),
@@ -84,6 +95,7 @@ export function TraceRoomProvider({ children }: { children: ReactNode }) {
         sessions,
         selected,
         loadingScenario,
+        activeRunSymbol,
         booting,
         error,
         selectSession: setSelectedId,
@@ -103,4 +115,3 @@ export function useTraceRoom(): TraceRoomState {
   }
   return value;
 }
-

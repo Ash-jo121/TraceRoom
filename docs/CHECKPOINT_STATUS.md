@@ -29,6 +29,15 @@ pipeline and recorded in SigNoz.
 - The live room visualizes active agent transmissions while a session runs,
   then switches to the persisted replay without inventing execution results.
 - Downloaded block receipts include a SHA-256 checksum over their proof payload.
+- Snapshot Forge supports NSE and US equity candidates backed by Twelve Data.
+- SMA20, EMA9, RSI14, and average volume are computed locally and tested.
+- OpenAI web search adds cited context on a non-authoritative rail that cannot
+  replace numeric fields.
+- Candidates expose explicit ready, stale, blocked, fixture fallback, and locked
+  states with field-level provenance.
+- Only validated immutable snapshots can enter the existing agent pipeline.
+- Custom snapshots retain healthy and evidence-fault runs; evaluation is
+  skipped unless a matching fixture exists.
 
 ## Working Demo Path
 
@@ -43,9 +52,11 @@ pipeline and recorded in SigNoz.
 8. Download the proof receipt or copy the trace ID from the Evidence page.
 9. Open the `debate.session` trace in SigNoz and inspect its stage hierarchy,
    attributes, events, logs, and error status.
+10. Open Snapshot Forge, create and lock a second stock, then watch the agents
+    deliberate over the new evidence.
 
 ## Pending
 
-- Final dashboards and alerts.
+- Capture final dashboard and alert screenshots plus their live URLs.
 
 Live market trading and paper trading are intentionally deprioritized.

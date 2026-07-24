@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SpanContext } from "@opentelemetry/api";
 import { agentConfigs } from "../config/agents";
+import type { MarketSnapshot } from "../domain/market";
 import { runFinalVoteStage } from "../debate/runFinalVoteStage";
 import { runProposalStage } from "../debate/runProposalStage";
 import { runRebuttalStage } from "../debate/runRebuttalStage";
@@ -26,6 +27,11 @@ import {
 import { scenarioEnvironmentValue } from "../scenarios/runScenario";
 import type { Position } from "../schemas/proposal";
 import { logError, logInfo } from "../telemetry/logger";
+import {
+  createSessionLlmUsage,
+  finalizeSessionLlmUsage,
+  withSessionLlmUsage,
+} from "../telemetry/sessionLlmUsage";
 import { withSpan } from "../telemetry/withSpan";
 import type { RecordedSession, ReplayStep, SessionScenario } from "./types";
 
@@ -55,30 +61,33 @@ class ControlledEvidenceBlock extends Error {
 
 export async function runDebateSession(
   scenario: SessionScenario,
+  snapshot: MarketSnapshot = marketSnapshot,
 ): Promise<RecordedSession> {
   const sessionId = randomUUID();
   const createdAt = new Date().toISOString();
   let completedResult: DebateResult | undefined;
   let controlledError: ControlledWorkflowError | undefined;
+  const sessionLlmUsage = createSessionLlmUsage();
 
   let debateResult: DebateResult;
 
   try {
-    debateResult = await withSpan("debate.session", async (sessionSpan) => {
+    debateResult = await withSessionLlmUsage(sessionLlmUsage, () =>
+      withSpan("debate.session", async (sessionSpan) => {
       sessionSpan.setAttributes({
         "traceroom.session.id": sessionId,
         "traceroom.session.mode": "historical_replay",
         "traceroom.scenario": scenario,
         "scenario.injected": scenario !== "healthy",
         "scenario.type": scenario,
-        "market.snapshot.id": marketSnapshot.snapshotId,
-        "market.symbol": marketSnapshot.symbol,
-        "decision.horizon_minutes": marketSnapshot.decisionHorizonMinutes,
+        "market.snapshot.id": snapshot.snapshotId,
+        "market.symbol": snapshot.symbol,
+        "decision.horizon_minutes": snapshot.decisionHorizonMinutes,
         "debate.agent_count": agentConfigs.length,
         "debate.max_rounds": 3,
       });
 
-      await traceMarketSnapshot(marketSnapshot);
+      await traceMarketSnapshot(snapshot);
 
       const generatedProposals = await withSpan(
         "debate.round.proposal",
@@ -89,7 +98,7 @@ export async function runDebateSession(
             "debate.agent_count": agentConfigs.length,
           });
 
-          const results = await runProposalStage(agentConfigs, marketSnapshot);
+          const results = await runProposalStage(agentConfigs, snapshot);
 
           span.setAttributes({
             "proposal.long_count": results.filter(
@@ -113,6 +122,7 @@ export async function runDebateSession(
       const controlledScenario = applyControlledEvidenceFault(
         generatedProposals,
         scenarioEnvironmentValue(scenario),
+        snapshot,
       );
       const proposals = controlledScenario.proposals;
 
@@ -138,7 +148,7 @@ export async function runDebateSession(
       }
 
       const evidenceValidation = await traceEvidenceValidation(
-        marketSnapshot,
+        snapshot,
         proposals,
       );
 
@@ -201,13 +211,19 @@ export async function runDebateSession(
         logError("Evidence integrity gate blocked the debate pipeline", {
           "event.name": "pipeline.evidence_integrity.blocked",
           "traceroom.session.id": sessionId,
-          "snapshot.id": marketSnapshot.snapshotId,
+          "snapshot.id": snapshot.snapshotId,
           "pipeline.blocked_at": "EVIDENCE_VALIDATION",
           "pipeline.block_reason": "EVIDENCE_INTEGRITY",
           "pipeline.short_circuited": true,
           "evidence.invalid_count": evidenceValidation.invalidCount,
           "evidence.invalid_agent_count": evidenceValidation.invalidAgentCount,
         });
+        finalizeSessionLlmUsage(
+          sessionSpan,
+          sessionLlmUsage,
+          scenario,
+          "EVIDENCE_BLOCKED",
+        );
         throw new ControlledEvidenceBlock(
           `${evidenceValidation.invalidCount} evidence claim(s) failed validation; downstream stages were not run`,
         );
@@ -224,7 +240,7 @@ export async function runDebateSession(
 
           const results = await runRebuttalStage(
             agentConfigs,
-            marketSnapshot,
+            snapshot,
             proposals,
           );
           const critiqueCount = results.reduce(
@@ -256,7 +272,7 @@ export async function runDebateSession(
 
           const generatedResults = await runFinalVoteStage(
             agentConfigs,
-            marketSnapshot,
+            snapshot,
             proposals,
             rebuttals,
           );
@@ -381,7 +397,7 @@ export async function runDebateSession(
       logInfo("Consensus resolved", {
         "event.name": "debate.consensus.resolved",
         "traceroom.session.id": sessionId,
-        "snapshot.id": marketSnapshot.snapshotId,
+        "snapshot.id": snapshot.snapshotId,
         "consensus.status": consensus.status,
         "consensus.position": consensus.position ?? "none",
         "consensus.unanimous": consensus.unanimous,
@@ -417,7 +433,7 @@ export async function runDebateSession(
 
       const riskReview = await traceRiskReview(
         consensus,
-        marketSnapshot,
+        snapshot,
         riskScenario.policy,
         evidenceValidation.blocked,
       );
@@ -456,6 +472,12 @@ export async function runDebateSession(
       completedResult = result;
 
       if (scenario === "error") {
+        finalizeSessionLlmUsage(
+          sessionSpan,
+          sessionLlmUsage,
+          scenario,
+          "ERROR",
+        );
         await withSpan("workflow.recording", async (span) => {
           sessionSpan.setAttribute("decision.outcome", "ERROR");
           sessionSpan.setAttributes({
@@ -479,8 +501,15 @@ export async function runDebateSession(
         });
       }
 
+      finalizeSessionLlmUsage(
+        sessionSpan,
+        sessionLlmUsage,
+        scenario,
+        evidenceValidation.blocked ? "EVIDENCE_BLOCKED" : riskReview.status,
+      );
       return result;
-    });
+      }),
+    );
   } catch (error) {
     if (error instanceof ControlledEvidenceBlock && completedResult) {
       debateResult = completedResult;
@@ -502,7 +531,7 @@ export async function runDebateSession(
   const evaluation =
     controlledError || !debateResult.consensus
       ? null
-      : await evaluateConsensus(sessionId, debateResult);
+      : await evaluateConsensus(sessionId, debateResult, snapshot);
   const executionAllowed =
     !controlledError && (debateResult.riskReview?.tradeAllowed ?? false);
   const outcome = controlledError
@@ -518,7 +547,7 @@ export async function runDebateSession(
     mode: scenario,
     scenario,
     scenarioInjection: buildScenarioInjection(debateResult, controlledError),
-    snapshot: marketSnapshot,
+    snapshot,
     agents: [...agentConfigs],
     lifecycle: buildLifecycle(debateResult, controlledError),
     stageStatuses: buildStageStatuses(
@@ -534,6 +563,12 @@ export async function runDebateSession(
     evidenceValidation: debateResult.evidenceValidation,
     riskReview: debateResult.riskReview,
     evaluation,
+    evaluationNote:
+      evaluation !== null
+        ? "Historical outcome evaluation completed."
+        : snapshot.snapshotId !== evaluationFixture.snapshotId
+          ? "Historical outcome evaluation skipped because this dynamic snapshot has no matching outcome fixture."
+          : null,
     execution: {
       executionAllowed,
       status: executionAllowed ? "READY" : "BLOCKED",
@@ -555,7 +590,7 @@ export async function runDebateSession(
           },
         }
       : {}),
-    replay: buildReplay(debateResult, controlledError),
+    replay: buildReplay(debateResult, snapshot, controlledError),
     signoz: {
       traceId: debateResult.sourceSpanContext.traceId,
       traceUrl: `${signozBaseUrl()}/trace/${debateResult.sourceSpanContext.traceId}`,
@@ -568,6 +603,7 @@ export async function runDebateSession(
 async function evaluateConsensus(
   sessionId: string,
   debateResult: DebateResult,
+  snapshot: MarketSnapshot,
 ): Promise<RecordedSession["evaluation"]> {
   const consensus = debateResult.consensus;
 
@@ -575,9 +611,7 @@ async function evaluateConsensus(
     return null;
   }
 
-  if (evaluationFixture.snapshotId !== marketSnapshot.snapshotId) {
-    throw new Error("Evaluation fixture does not match the debate snapshot");
-  }
+  if (evaluationFixture.snapshotId !== snapshot.snapshotId) return null;
 
   const dissentingPositions: Position[] = debateResult.finalVotes
     .filter((vote) => consensus.dissentingAgentIds?.includes(vote.agentId))
@@ -758,14 +792,15 @@ function buildScenarioInjection(
 
 function buildReplay(
   debateResult: DebateResult,
+  snapshot: MarketSnapshot,
   controlledError?: ControlledWorkflowError,
 ): ReplayStep[] {
   if (debateResult.evidenceValidation.blocked) {
     return [
       {
         order: 1,
-        title: `${marketSnapshot.symbol} snapshot captured`,
-        detail: `Snapshot ${marketSnapshot.snapshotId} captured ${marketSnapshot.symbol} at ${marketSnapshot.currentPrice}.`,
+        title: `${snapshot.symbol} snapshot captured`,
+        detail: `Snapshot ${snapshot.snapshotId} captured ${snapshot.symbol} at ${snapshot.currentPrice}.`,
       },
       {
         order: 2,
@@ -789,8 +824,8 @@ function buildReplay(
   const steps: ReplayStep[] = [
     {
       order: 1,
-      title: `${marketSnapshot.symbol} snapshot captured`,
-      detail: `Snapshot ${marketSnapshot.snapshotId} captured ${marketSnapshot.symbol} at ${marketSnapshot.currentPrice}.`,
+      title: `${snapshot.symbol} snapshot captured`,
+      detail: `Snapshot ${snapshot.snapshotId} captured ${snapshot.symbol} at ${snapshot.currentPrice}.`,
     },
     {
       order: 2,
@@ -838,6 +873,15 @@ function buildReplay(
       order: 8,
       title: "Controlled workflow error recorded",
       detail: controlledError.message,
+    });
+  }
+
+  if (snapshot.snapshotId !== evaluationFixture.snapshotId) {
+    steps.push({
+      order: steps.length + 1,
+      title: "Historical evaluation skipped",
+      detail:
+        "This dynamic snapshot has no matching future-outcome fixture. The decision trace remains valid.",
     });
   }
 

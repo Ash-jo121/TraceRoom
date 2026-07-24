@@ -11,7 +11,7 @@
     "run:once": "tsx src/index.ts",
     "api": "tsx src/api/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/session/testSession.ts",
+    "test": "tsx src/session/testSession.ts && tsx src/market/testSnapshot.ts",
     "trace:test": "tsx src/telemetry/testTrace.ts"
   },
   "keywords": [],

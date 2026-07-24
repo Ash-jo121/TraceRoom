@@ -89,4 +89,30 @@ that output before consensus.
 - `traceroom.llm.output_tokens`
 - `traceroom.llm.cost_usd`
 - `traceroom.llm.latency_ms`
+- `traceroom.session.cost_usd`
 - evaluation completion and decision-regret metrics
+
+The root session span also records `llm.session.call_count`,
+`llm.session.input_tokens`, `llm.session.output_tokens`,
+`llm.session.cost_usd`, `llm.session.cost_threshold_usd`, and
+`llm.session.cost_threshold_exceeded`.
+
+## Snapshot Forge Trace
+
+`POST /market/snapshots` creates:
+
+- `snapshot.discover`
+  - `market.provider.fetch`
+  - `openai.web_search` when `OPENAI_API_KEY` is configured
+
+The root carries `snapshot.candidate.id`, `market.symbol`,
+`market.exchange`, `snapshot.status`, `snapshot.can_lock`, source count, and
+validation check count. Numeric retrieval is labeled
+`snapshot.numeric_authority=twelve_data`; web research is labeled
+`snapshot.research.numeric_authority=false`.
+
+`POST /market/snapshots/:id/lock` creates `snapshot.lock` with the candidate,
+snapshot, symbol, and terminal lock status. The subsequent `debate.session`
+uses the locked `market.snapshot.id`. Custom snapshots intentionally skip
+historical evaluation unless their snapshot ID matches a known evaluation
+fixture.

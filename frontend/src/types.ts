@@ -17,6 +17,78 @@ export interface CheckedEvidence {
   validationStatus: string;
 }
 
+export interface MarketSnapshot {
+  snapshotId: string;
+  symbol: string;
+  observedAt: string;
+  decisionHorizonMinutes: number;
+  currentPrice: number;
+  previousClose: number;
+  dayOpen: number;
+  dayHigh: number;
+  dayLow: number;
+  volume: number;
+  averageVolume: number;
+  indicators: {
+    sma20: number;
+    ema9: number;
+    rsi14: number;
+  };
+}
+
+export type SnapshotExchange = "NSE" | "US";
+export type SnapshotStatus =
+  | "READY"
+  | "STALE"
+  | "BLOCKED"
+  | "FIXTURE_FALLBACK"
+  | "LOCKED";
+
+export interface SnapshotCandidate {
+  schemaVersion: 1;
+  candidateId: string;
+  status: SnapshotStatus;
+  createdAt: string;
+  lockedAt: string | null;
+  fallbackReason: string | null;
+  instrument: {
+    requestedSymbol: string;
+    symbol: string;
+    exchange: SnapshotExchange;
+    providerSymbol: string;
+    name: string | null;
+    currency: string | null;
+  };
+  snapshot: MarketSnapshot | null;
+  research: {
+    status: "READY" | "UNAVAILABLE";
+    summary: string;
+    catalysts: string[];
+    risks: string[];
+    responseId: string | null;
+    model: string | null;
+    note: string | null;
+  };
+  sources: Array<{
+    id: string;
+    kind: "MARKET_DATA" | "WEB";
+    provider: string;
+    title: string;
+    url: string;
+    observedAt: string | null;
+    fields: string[];
+  }>;
+  fieldProvenance: Record<string, string[]>;
+  checks: Array<{
+    id: string;
+    label: string;
+    status: "PASS" | "WARN" | "FAIL";
+    detail: string;
+  }>;
+  canLock: boolean;
+  canRun: boolean;
+}
+
 export interface RecordedSession {
   schemaVersion: 4;
   sessionId: string;
@@ -41,24 +113,7 @@ export interface RecordedSession {
       forcedValue: number;
     };
   };
-  snapshot: {
-    snapshotId: string;
-    symbol: string;
-    observedAt: string;
-    decisionHorizonMinutes: number;
-    currentPrice: number;
-    previousClose: number;
-    dayOpen: number;
-    dayHigh: number;
-    dayLow: number;
-    volume: number;
-    averageVolume: number;
-    indicators: {
-      sma20: number;
-      ema9: number;
-      rsi14: number;
-    };
-  };
+  snapshot: MarketSnapshot;
   agents: Array<{
     agentId: string;
     displayName: string;
@@ -140,6 +195,7 @@ export interface RecordedSession {
       thresholdValue?: number;
     }>;
   } | null;
+  evaluationNote?: string | null;
   execution: {
     executionAllowed: boolean;
     status: "READY" | "BLOCKED";
@@ -171,4 +227,3 @@ export interface TelemetryQuestionAnswer {
   signozLinks: RecordedSession["signoz"];
   source: "signoz_mcp" | "session_fallback";
 }
-

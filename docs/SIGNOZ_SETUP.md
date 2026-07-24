@@ -64,20 +64,56 @@ The expected root is `debate.session`. A successful healthy run has 27 spans:
 The separate `decision.evaluation` trace links back to the debate trace.
 Batch export can take a few seconds before a trace appears in SigNoz.
 
-## Suggested Dashboard Panels
+## Submission Dashboard
 
-- decisions by outcome
-- P95 debate latency
-- risk veto rate
-- evidence-integrity violations
-- LLM latency and cost by agent/stage
-- final-vote changes
-- decision regret
+Create or verify a dashboard named **TraceRoom / Submission Evidence**. Use
+Query Builder so the definitions survive SigNoz schema upgrades:
 
-## Suggested Alerts
+| Panel | Signal | Query |
+| --- | --- | --- |
+| Session outcomes | Traces, time series | Filter `service.name = 'traceroom-debate-simulation' AND name = 'debate.session'`; aggregate `count`; group by `traceroom.scenario`, `decision.outcome` |
+| Evidence blocks | Traces, value | Filter `name = 'debate.session' AND pipeline.block_reason = 'EVIDENCE_INTEGRITY' AND pipeline.short_circuited = true`; aggregate `count` |
+| LLM calls | Metrics | Metric `traceroom.llm.calls`; within `sum`; across `sum`; group by `agent.name`, `debate.stage`, `llm.outcome` |
+| LLM input tokens | Metrics | Metric `traceroom.llm.input_tokens`; within `sum`; across `sum`; group by `agent.name` |
+| LLM output tokens | Metrics | Metric `traceroom.llm.output_tokens`; within `sum`; across `sum`; group by `agent.name` |
+| Estimated LLM cost | Metrics | Metric `traceroom.llm.cost_usd`; within `sum`; across `sum`; group by `agent.name` |
+| LLM p95 latency | Metrics | Metric `traceroom.llm.latency_ms`; within `p95`; across `max`; group by `agent.name`, `debate.stage` |
+| Triggered risk rules | Traces, table | Filter `name = 'risk.review' AND risk.triggered_rule_count > 0`; aggregate `count`; group by `risk.triggered_rule_ids`, `risk.review.status` |
+| Deadlocks | Traces, value | Filter `name = 'debate.session' AND consensus.status = 'DEADLOCKED'`; aggregate `count` |
+| Completed evaluations | Metrics | Metric `traceroom.evaluation.completed.count`; within `sum`; across `sum`; group by `verdict` |
+| Decision regret | Metrics | Metric `traceroom.decision.regret`; within `avg`; across `avg`; group by `position` |
+| Session cost | Metrics | Metric `traceroom.session.cost_usd`; within `max`; across `max`; group by `traceroom.scenario`, `decision.outcome` |
 
-- evidence validation status is not `valid`
-- risk review status is `VETOED`
-- consensus status is `DEADLOCKED`
-- LLM call or debate session has error status
-- session cost exceeds the configured budget
+Use the previous 24 hours for submission screenshots, then narrow to the fresh
+demo run when presenting.
+
+## Submission Alerts
+
+Create or verify these rules. A five-minute evaluation window and one-minute
+evaluation interval are appropriate for the demo:
+
+1. **TraceRoom / Evidence Integrity Block**
+   - Signal: traces
+   - Filter: `name = 'debate.session' AND pipeline.block_reason = 'EVIDENCE_INTEGRITY'`
+   - Aggregate: `count`
+   - Fire when: above `0`
+2. **TraceRoom / Uncontrolled Workflow or LLM Failure**
+   - Signal: traces
+   - Filter: `service.name = 'traceroom-debate-simulation' AND ((name = 'llm.call' AND status = 'ERROR') OR (name = 'debate.session' AND status = 'ERROR' AND error.type != 'ControlledEvidenceBlock' AND error.type != 'ControlledWorkflowError'))`
+   - Aggregate: `count`
+   - Fire when: above `0`
+3. **TraceRoom / Session Cost Threshold**
+   - Signal: metrics
+   - Metric: `traceroom.session.cost_usd`
+   - Within: `max`; across: `max`
+   - Fire when: above the value of `SESSION_COST_ALERT_THRESHOLD_USD`
+
+The controlled evidence and controlled workflow scenarios are deliberately
+excluded from the uncontrolled-failure rule. They remain visible in the
+scenario and evidence panels.
+
+## Evidence Capture
+
+After running a fresh INFY evidence fault, fill in
+`docs/SIGNOZ_SUBMISSION_EVIDENCE.md`. Do not claim a dashboard, alert, or MCP
+result until its URL and screenshot have been captured.

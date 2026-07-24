@@ -38,7 +38,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -49,7 +50,8 @@ a {
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -1285,6 +1287,594 @@ a {
   animation: spin 1.1s linear infinite;
 }
 
+.forge-page {
+  padding-bottom: 110px;
+}
+
+.forge-hero {
+  align-items: end;
+  display: grid;
+  gap: 48px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  min-height: 420px;
+  padding: 72px 0 52px;
+}
+
+.forge-hero h1 {
+  font-size: clamp(56px, 7.5vw, 112px);
+  font-weight: 620;
+  letter-spacing: -0.065em;
+  line-height: 0.88;
+  margin: 24px 0 0;
+  max-width: 10ch;
+}
+
+.forge-hero > p {
+  border-left: 1px solid var(--line-bright);
+  color: #b8c0c6;
+  font-size: 17px;
+  line-height: 1.65;
+  margin: 0 0 4px;
+  max-width: 42ch;
+  padding-left: 28px;
+}
+
+.forge-console {
+  background:
+    linear-gradient(110deg, rgb(215 255 100 / 5%), transparent 38%),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.forge-form {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.55fr) auto;
+  padding: 24px;
+}
+
+.forge-input {
+  display: grid;
+  gap: 9px;
+}
+
+.forge-input label,
+.json-toolbar,
+.forge-section-title,
+.snapshot-numbers span,
+.source-list span {
+  color: var(--muted);
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.11em;
+}
+
+.forge-input input,
+.forge-input select {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  height: 50px;
+  padding: 0 14px;
+}
+
+.forge-input input {
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 20px;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.forge-input input:hover,
+.forge-input select:hover {
+  border-color: var(--line-bright);
+}
+
+.forge-submit[disabled],
+.release-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.forge-submit svg {
+  font-size: 18px;
+}
+
+.forge-submit[disabled] svg {
+  animation: signal 1s ease-in-out infinite;
+}
+
+.forge-stage-rail {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 24px;
+  position: relative;
+}
+
+.forge-stage-line {
+  background: var(--line);
+  height: 1px;
+  left: calc(12.5% + 24px);
+  overflow: hidden;
+  position: absolute;
+  right: calc(12.5% + 24px);
+  top: 39px;
+}
+
+.forge-stage-line span {
+  background: var(--accent);
+  display: block;
+  height: 100%;
+  transform-origin: left center;
+  width: 100%;
+}
+
+.forge-stage {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  text-align: center;
+}
+
+.forge-stage-node {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  display: flex;
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 9px;
+  height: 31px;
+  justify-content: center;
+  margin-bottom: 12px;
+  position: relative;
+  width: 31px;
+}
+
+.forge-stage.completed,
+.forge-stage.active {
+  color: var(--text);
+}
+
+.forge-stage.completed .forge-stage-node,
+.forge-stage.active .forge-stage-node {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.forge-stage.active .forge-stage-node {
+  box-shadow: 0 0 0 8px rgb(215 255 100 / 8%);
+}
+
+.forge-stage strong {
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.forge-stage small {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+.forge-error {
+  border-radius: 9px;
+  margin-top: 18px;
+  padding: 14px 16px;
+}
+
+.forge-loading,
+.forge-empty {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: clamp(28px, 6vw, 90px);
+  margin-top: 34px;
+  min-height: 330px;
+  padding: 52px clamp(18px, 6vw, 90px);
+}
+
+.forge-loading h2,
+.forge-empty h2 {
+  font-size: clamp(30px, 4vw, 58px);
+  letter-spacing: -0.045em;
+  margin: 14px 0 10px;
+}
+
+.forge-loading p,
+.forge-empty p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.forge-empty > span {
+  color: var(--line-bright);
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: clamp(72px, 12vw, 170px);
+  font-weight: 800;
+  letter-spacing: -0.1em;
+}
+
+.forge-orbit {
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 174px;
+  position: relative;
+  width: 174px;
+}
+
+.forge-orbit::before,
+.forge-orbit::after {
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  content: "";
+  inset: 24px;
+  position: absolute;
+}
+
+.forge-orbit::after {
+  inset: 54px;
+}
+
+.forge-orbit span {
+  animation: forge-orbit 2.4s linear infinite;
+  background: var(--accent);
+  border-radius: 50%;
+  height: 9px;
+  left: 50%;
+  position: absolute;
+  top: -5px;
+  transform-origin: 0 92px;
+  width: 9px;
+}
+
+.forge-orbit span:nth-child(2) {
+  animation-delay: -0.8s;
+  transform-origin: 0 68px;
+  top: 19px;
+}
+
+.forge-orbit span:nth-child(3) {
+  animation-delay: -1.6s;
+  transform-origin: 0 38px;
+  top: 49px;
+}
+
+.forge-result {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
+  margin-top: 34px;
+}
+
+.forge-snapshot-panel,
+.forge-evidence-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.forge-snapshot-panel {
+  border-radius: var(--radius) 0 0 var(--radius);
+  overflow: hidden;
+}
+
+.forge-evidence-panel {
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 28px;
+}
+
+.forge-evidence-panel > section + section {
+  border-top: 1px solid var(--line);
+  margin-top: 28px;
+  padding-top: 28px;
+}
+
+.forge-panel-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 28px;
+}
+
+.forge-panel-header h2 {
+  font-size: clamp(48px, 6vw, 82px);
+  letter-spacing: -0.06em;
+  line-height: 0.9;
+  margin: 13px 0 0;
+}
+
+.snapshot-state {
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  padding: 8px 10px;
+}
+
+.state-blocked,
+.state-stale {
+  border-color: var(--danger);
+  color: #ff9e86;
+}
+
+.snapshot-numbers {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.snapshot-numbers div {
+  display: grid;
+  gap: 9px;
+  padding: 22px;
+}
+
+.snapshot-numbers div + div {
+  border-left: 1px solid var(--line);
+}
+
+.snapshot-numbers strong {
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: clamp(18px, 2vw, 27px);
+}
+
+.json-toolbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 18px;
+}
+
+.json-toolbar > div {
+  display: flex;
+  gap: 5px;
+}
+
+.json-toolbar .icon-button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  height: 32px;
+  width: 32px;
+}
+
+.snapshot-json {
+  background: #0c0e0f;
+  color: #c9d1d7;
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 11px;
+  line-height: 1.75;
+  margin: 0;
+  max-height: 590px;
+  overflow: auto;
+  padding: 22px;
+}
+
+.blocked-snapshot {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  padding: 64px 28px;
+}
+
+.blocked-snapshot > svg {
+  color: var(--danger);
+  font-size: 40px;
+}
+
+.blocked-snapshot h3 {
+  font-size: 32px;
+  letter-spacing: -0.04em;
+  margin: 24px 0 8px;
+}
+
+.blocked-snapshot p,
+.lock-reason,
+.research-unavailable,
+.muted-copy {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.forge-section-title {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.forge-section-title svg {
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.check-list,
+.source-list {
+  display: grid;
+  gap: 8px;
+}
+
+.check-item {
+  align-items: start;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr;
+  padding: 12px;
+}
+
+.check-item > span {
+  align-items: center;
+  background: rgb(215 255 100 / 8%);
+  border-radius: 50%;
+  color: var(--accent);
+  display: flex;
+  height: 25px;
+  justify-content: center;
+  width: 25px;
+}
+
+.check-fail > span,
+.check-warn > span {
+  background: var(--danger-soft);
+  color: #ff9e86;
+}
+
+.check-item strong {
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.check-item p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.provenance-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.provenance-fields button {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 9px;
+  padding: 7px 8px;
+}
+
+.provenance-fields button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.provenance-readout {
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 10px;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  margin-top: 10px;
+  padding: 13px;
+}
+
+.provenance-readout span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.provenance-readout strong {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.source-list article {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.source-list article > div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.source-list strong {
+  font-size: 12px;
+}
+
+.source-list a,
+.source-list article > p {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 8px 0 0;
+}
+
+.source-list a:hover {
+  color: var(--accent);
+}
+
+.research-brief {
+  border-left: 1px solid var(--line-bright);
+  margin-top: 14px;
+  padding-left: 14px;
+}
+
+.research-brief p,
+.research-brief li {
+  color: #b8c0c6;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.research-brief strong {
+  display: block;
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  margin-top: 14px;
+}
+
+.research-brief ul {
+  margin: 7px 0 0;
+  padding-left: 18px;
+}
+
+.release-button {
+  margin-top: 28px;
+  width: 100%;
+}
+
+.lock-reason {
+  font-size: 11px;
+  margin: 10px 0 0;
+  text-align: center;
+}
+
+@keyframes forge-orbit {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -1316,6 +1906,23 @@ a {
 
   .rupture-copy h2 {
     max-width: 12ch;
+  }
+
+  .forge-result {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
+  }
+
+  .snapshot-numbers {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .snapshot-numbers div:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .snapshot-numbers div:nth-child(4) {
+    border-top: 1px solid var(--line);
   }
 }
 
@@ -1426,6 +2033,24 @@ a {
   .evidence-matrix {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .forge-hero,
+  .forge-result {
+    grid-template-columns: 1fr;
+  }
+
+  .forge-hero {
+    min-height: 360px;
+  }
+
+  .forge-hero > p {
+    max-width: 56ch;
+  }
+
+  .forge-snapshot-panel,
+  .forge-evidence-panel {
+    border-radius: var(--radius);
+  }
 }
 
 @media (max-width: 640px) {
@@ -1528,6 +2153,100 @@ a {
 
   .question-list {
     display: grid;
+  }
+
+  .forge-hero {
+    align-items: start;
+    gap: 28px;
+    padding: 52px 0 40px;
+  }
+
+  .forge-hero h1 {
+    font-size: 57px;
+  }
+
+  .forge-form {
+    grid-template-columns: 1fr;
+  }
+
+  .forge-stage-rail {
+    gap: 16px;
+    grid-template-columns: 1fr;
+  }
+
+  .forge-stage-line {
+    bottom: 39px;
+    height: auto;
+    left: 39px;
+    right: auto;
+    top: 39px;
+    width: 1px;
+  }
+
+  .forge-stage-line span {
+    height: 100%;
+    transform-origin: center top;
+    width: 1px;
+  }
+
+  .forge-stage {
+    align-items: center;
+    display: grid;
+    gap: 0 12px;
+    grid-template-columns: 31px 1fr;
+    text-align: left;
+  }
+
+  .forge-stage-node {
+    grid-row: 1 / 3;
+    margin: 0;
+  }
+
+  .forge-stage small {
+    margin-top: 3px;
+  }
+
+  .forge-loading,
+  .forge-empty {
+    align-items: flex-start;
+    flex-direction: column;
+    min-height: 390px;
+  }
+
+  .forge-orbit {
+    height: 128px;
+    width: 128px;
+  }
+
+  .forge-orbit span {
+    transform-origin: 0 68px;
+  }
+
+  .forge-orbit span:nth-child(2) {
+    transform-origin: 0 48px;
+  }
+
+  .forge-orbit span:nth-child(3) {
+    transform-origin: 0 24px;
+  }
+
+  .forge-panel-header {
+    align-items: flex-start;
+    gap: 18px;
+  }
+
+  .snapshot-numbers {
+    grid-template-columns: 1fr;
+  }
+
+  .snapshot-numbers div + div,
+  .snapshot-numbers div:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .forge-evidence-panel {
+    padding: 22px 18px;
   }
 }
 

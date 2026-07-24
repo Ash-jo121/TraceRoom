@@ -52,11 +52,13 @@ page combines natural-language SigNoz MCP investigation with a downloadable
 SHA-256 proof receipt. Every run persists the real agent-stage outputs and
 emits a fresh `debate.session` trace.
 
-The interface is split into four purpose-built spaces:
+The interface is split into five purpose-built spaces:
 
 - **Command** tells the product story and launches the breach.
 - **Agent room** renders the active reasoning network on an interactive canvas,
   then replays recorded agent transmissions.
+- **Snapshot forge** validates a new NSE or US equity snapshot, shows field-level
+  provenance, locks the evidence, and releases a healthy agent session.
 - **Incidents** compares healthy, evidence-fault, risk-veto, error, and deadlock
   sessions without collapsing them into a generic dashboard.
 - **Evidence** reconstructs a selected decision through SigNoz MCP and exports
@@ -92,6 +94,28 @@ Vote-injected runs show an **Injected Scenario** badge and preserve a
 generated-to-forced mapping for every controlled final vote.
 
 - Live and paper trading: deprioritized
+
+## Snapshot Forge
+
+Snapshot Forge is an optional showcase path. The canonical INFY fixture remains
+the guaranteed demo.
+
+Set `TWELVE_DATA_API_KEY` to validate symbols and retrieve quote plus daily
+OHLCV history. TraceRoom calculates SMA20, EMA9, RSI14, and average volume
+locally. Set the separate `OPENAI_API_KEY` to attach web-searched company
+context, catalysts, risks, and citations. OpenAI output is never merged into
+numeric market fields.
+
+The flow is deliberately gated:
+
+1. `POST /market/snapshots` creates a candidate.
+2. A candidate can be `READY`, `STALE`, `BLOCKED`, or `FIXTURE_FALLBACK`.
+3. `POST /market/snapshots/:id/lock` creates an immutable `LOCKED` candidate.
+4. `POST /sessions/run` accepts `{ "scenario": "healthy", "snapshotId": "..." }`.
+
+Only locked candidates can run. If Twelve Data fails, INFY on NSE may use the
+clearly labeled fixture; any other symbol stays blocked. If OpenAI web search
+fails, trusted market numbers can still pass validation without context.
 
 ## SigNoz
 

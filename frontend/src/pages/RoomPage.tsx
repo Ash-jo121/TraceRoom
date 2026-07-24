@@ -35,7 +35,7 @@ const liveStages = [
 ];
 
 export function RoomPage() {
-  const { selected, loadingScenario, runScenario } = useTraceRoom();
+  const { selected, loadingScenario, activeRunSymbol, runScenario } = useTraceRoom();
   const reduce = useReducedMotion();
   const [replayIndex, setReplayIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -127,7 +127,7 @@ export function RoomPage() {
                     <strong>{stage.agent}</strong>
                     <span>{index === liveIndex ? "TALKING" : index < liveIndex ? "HEARD" : "QUEUED"}</span>
                   </header>
-                  <p>{stage.detail}</p>
+                  <p>{stage.detail.replace("INFY", activeRunSymbol ?? "INFY")}</p>
                   <footer>{stage.status.toUpperCase()}</footer>
                 </motion.article>
               ))}

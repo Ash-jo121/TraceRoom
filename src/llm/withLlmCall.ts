@@ -1,6 +1,7 @@
 import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { env } from "../config/env";
 import { recordLlmMetrics } from "../telemetry/llmMetrics";
+import { recordSessionLlmCall } from "../telemetry/sessionLlmUsage";
 
 const tracer = trace.getTracer("traceroom-debate-simulation", "0.1.0");
 
@@ -156,6 +157,11 @@ export async function withLlmCall<T extends LlmCompletionLike>(
           costUsd: totalCostUsd,
           latencyMs,
           outcome,
+        });
+        recordSessionLlmCall({
+          inputTokens,
+          outputTokens,
+          costUsd: totalCostUsd,
         });
 
         span.end();

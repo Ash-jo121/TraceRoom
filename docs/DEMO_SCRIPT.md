@@ -1,6 +1,6 @@
 # Demo Script
 
-## Five-Run Flow
+## Final Submission Flow
 
 1. Open the TraceRoom Command page and frame it as a circuit breaker, not a
    trading app.
@@ -28,8 +28,15 @@
      `CONSENSUS_REQUIRED`.
    - **Error Session** injects a controlled post-stage recording error; show
      the readable error in TraceRoom and the error spans in SigNoz.
-9. Close with: "TraceRoom does not promise autonomous financial agents will
-   always be right. It makes sure they can never be opaque."
+9. Open Snapshot Forge and enter a second supported stock. Show Twelve Data
+   supplying the numeric snapshot while OpenAI web search supplies cited
+   contextual research on a separate trust rail.
+10. Select several fields to show their provenance, copy or download the JSON,
+    then click **Lock and Release Agents**.
+11. Watch the selected symbol enter the live Agent Room. Explain that custom
+    stocks skip historical evaluation unless a matching fixture exists.
+12. Close with: "TraceRoom can onboard new decisions without weakening its
+    evidence boundary."
 
 Every scenario starts with the real INFY proposal LLM stage. The evidence-fault
 scenario stops there when validation fails; the other scenarios continue
